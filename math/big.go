@@ -3,7 +3,7 @@ package math
 
 import (
 	"crypto/rand"
-	"git.phjr.com/util/conv"
+	"github.com/phjt-go/util/conv"
 	"math/big"
 )
 

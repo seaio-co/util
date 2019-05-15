@@ -3,7 +3,7 @@
 package intpool
 
 import (
-	"git.phjr.com/util/stack"
+	"github.com/phjt-go/util/stack"
 	"math/big"
 )
 
