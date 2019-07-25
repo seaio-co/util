@@ -57,7 +57,6 @@ var Zero = New(0, 1)
 
 // fiveDec used in Cash Rounding
 var fiveDec = New(5, 0)
-
 var zeroInt = big.NewInt(0)
 var oneInt = big.NewInt(1)
 var twoInt = big.NewInt(2)
