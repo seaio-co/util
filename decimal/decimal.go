@@ -99,8 +99,8 @@ func NewFromBigInt(value *big.Int, exp int32) Decimal {
 //
 // Example:
 //
-//  d, err := NewFromString("-123.45")
-//  2, err := NewFromString(".0001")
+//     d, err := NewFromString("-123.45")
+//     d2, err := NewFromString(".0001")
 //
 func NewFromString(value string) (Decimal, error) {
 	originalInput := value
