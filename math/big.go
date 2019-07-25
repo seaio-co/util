@@ -64,7 +64,7 @@ func PaddedBigBytes(bigint *big.Int, n int) []byte {
 	return ret
 }
 
-// 返回位置n的字节，n==0返回最小有效字节
+// bigEndianByteAt 返回位置n的字节，n==0返回最小有效字节
 func bigEndianByteAt(bigint *big.Int, n int) byte {
 	words := bigint.Bits()
 	// 检查字节将驻留在的 word-bucket
