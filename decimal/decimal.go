@@ -1,11 +1,5 @@
 // Package decimal implements an arbitrary precision fixed-point decimal.
 //
-// To use as part of a struct:
-//
-//     type Struct struct {
-//         Number Decimal
-//     }
-//
 // The zero-value of a Decimal is 0, as you would expect.
 //
 // The best way to create a new Decimal is to use decimal.NewFromString, ex:
