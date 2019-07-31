@@ -12,16 +12,18 @@ type ResponseBody struct {
 	Data     interface{}
 }
 
-func Success(payload []byte) ResponseBody {
+// Success 成功
+func Success(data interface{}) ResponseBody {
 	return ResponseBody{
 		Status: "200",
-		Data:   payload,
+		Data:   data,
 	}
 }
 
-func Error(msg string) ResponseBody {
+// Error 失败
+func Error(errcode, msg string) ResponseBody {
 	return ResponseBody{
-		Status:   "500",
+		Status:   errcode,
 		ErrorMsg: msg,
 	}
 }
