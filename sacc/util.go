@@ -121,7 +121,7 @@ func CreateTarFile(name string, files ...*os.File) (*os.File, error) {
 	return file, nil
 }
 
-// 删除文件，可传入多个参数
+// 删除文件，可传入多个
 func deleteFile(files ...*os.File) error {
 	for _, file := range files {
 		file.Close()
