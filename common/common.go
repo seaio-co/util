@@ -22,6 +22,7 @@ func IsEmpty(a interface{}) bool {
 
 var Locker = make(map[string]*sync.RWMutex)
 
+// Lock 锁
 func Lock(index string) {
 	for {
 		_, ok := Locker[index]
@@ -36,6 +37,7 @@ func Lock(index string) {
 	Locker[index].Lock()
 }
 
+// Unlock 解锁
 func Unlock(index string) {
 	Locker[index].Unlock()
 	//删除使用过的锁，避免map无限增加
