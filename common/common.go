@@ -44,7 +44,7 @@ func Unlock(index string) {
 	delete(Locker, index)
 }
 
-//生成32位md5字串
+// getMd5String 生成32位md5字串
 func getMd5String(s string) string {
 	h := md5.New()
 	h.Write([]byte(s))
