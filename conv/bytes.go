@@ -39,17 +39,17 @@ func FromHex(s string) []byte {
 	return h
 }
 
-// hasHexPrefix 验证str以“0x”或“0X”开头。
+// HasHexPrefix 验证str以“0x”或“0X”开头。
 func HasHexPrefix(str string) bool {
 	return len(str) >= 2 && str[0] == '0' && (str[1] == 'x' || str[1] == 'X')
 }
 
-// 验证是否为有效的十六进制字符。
+// isHexCharacter 验证是否为有效的十六进制字符。
 func isHexCharacter(c byte) bool {
 	return ('0' <= c && c <= '9') || ('a' <= c && c <= 'f') || ('A' <= c && c <= 'F')
 }
 
-// isHex验证每个字节是否是有效的十六进制字符串。
+// isHex 验证每个字节是否是有效的十六进制字符串。
 func IsHex(str string) bool {
 	if len(str)%2 != 0 {
 		return false
