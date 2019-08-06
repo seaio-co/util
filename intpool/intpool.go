@@ -1,5 +1,4 @@
 // 可以重复利用的big int池
-
 package intpool
 
 import (
