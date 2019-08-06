@@ -154,14 +154,11 @@ func RequireFromString(value string) Decimal {
 }
 
 // NewFromFloat converts a float64 to Decimal.
-//
 // The converted number will contain the number of significant digits that can be
 // represented in a float with reliable roundtrip.
 // This is typically 15 digits, but may be more in some cases.
 // See https://www.exploringbinary.com/decimal-precision-of-binary-floating-point-numbers/ for more information.
-//
 // For slightly faster conversion, use NewFromFloatWithExponent where you can specify the precision in absolute terms.
-//
 // NOTE: this will panic on NaN, +/-inf
 func NewFromFloat(value float64) Decimal {
 	if value == 0 {
