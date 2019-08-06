@@ -1,6 +1,4 @@
-// Package decimal implements an arbitrary precision fixed-point decimal.
-// The zero-value of a Decimal is 0, as you would expect.
-// NOTE: This can "only" represent numbers with a maximum of 2^31 digits after the decimal point.
+// 注: 只能表示小数点后最大2^31位的数，小数的零值是0
 package decimal
 
 import (
