@@ -1,14 +1,6 @@
 // Package decimal implements an arbitrary precision fixed-point decimal.
-//
 // The zero-value of a Decimal is 0, as you would expect.
-//
-// The best way to create a new Decimal is to use decimal.NewFromString, ex:
-//
-//     n, err := decimal.NewFromString("-123.4567")
-//     n.String() // output: "-123.4567"
-//
-// NOTE: This can "only" represent numbers with a maximum of 2^31 digits
-// after the decimal point.
+// NOTE: This can "only" represent numbers with a maximum of 2^31 digits after the decimal point.
 package decimal
 
 import (
