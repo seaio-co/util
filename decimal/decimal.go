@@ -1,4 +1,4 @@
-// 注: 只能表示小数点后最大2^31位的数，小数的零值是0
+// 注: 只能表示小数点后最大2^31位的数，零值是0
 package decimal
 
 import (
@@ -11,21 +11,7 @@ import (
 	"strings"
 )
 
-// DivisionPrecision is the number of decimal places in the result when it
-// doesn't divide exactly.
-//
-// Example:
-//
-//     d1 := decimal.NewFromFloat(2).Div(decimal.NewFromFloat(3)
-//     d1.String() // output: "0.6666666666666667"
-//     d2 := decimal.NewFromFloat(2).Div(decimal.NewFromFloat(30000)
-//     d2.String() // output: "0.0000666666666667"
-//     d3 := decimal.NewFromFloat(20000).Div(decimal.NewFromFloat(3)
-//     d3.String() // output: "6666.6666666666666667"
-//     decimal.DivisionPrecision = 3
-//     d4 := decimal.NewFromFloat(2).Div(decimal.NewFromFloat(3)
-//     d4.String() // output: "0.667"
-//
+// DivisionPrecision 是结果中小数位数的个数，当它不能精确除的时候。
 var DivisionPrecision = 16
 
 // MarshalJSONWithoutQuotes should be set to true if you want the decimal to
