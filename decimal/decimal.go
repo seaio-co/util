@@ -14,12 +14,8 @@ import (
 // DivisionPrecision 是结果中小数位数的个数，当它不能精确除的时候。
 var DivisionPrecision = 16
 
-// MarshalJSONWithoutQuotes should be set to true if you want the decimal to
-// be JSON marshaled as a number, instead of as a string.
-// WARNING: this is dangerous for decimals with many digits, since many JSON
-// unmarshallers (ex: Javascript's) will unmarshal JSON numbers to IEEE 754
-// double-precision floating point numbers, which means you can potentially
-// silently lose precision.
+// MarshalJSONWithoutQuotes 应该设置为true,如果希望将小数作为数字而不是字符串进行JSON序列化
+// WARNING: 可能会失去精度
 var MarshalJSONWithoutQuotes = false
 
 // Zero constant, to make computations faster.
