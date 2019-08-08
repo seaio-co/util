@@ -30,7 +30,7 @@ var fiveInt = big.NewInt(5)
 var tenInt = big.NewInt(10)
 var twentyInt = big.NewInt(20)
 
-// Decimal表示一个定点小数。它是不可变的。
+// Decimal表示一个定点小数,并且它是不可变的。
 // number = value * 10 ^ exp
 type Decimal struct {
 	value *big.Int
