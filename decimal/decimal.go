@@ -18,10 +18,9 @@ var DivisionPrecision = 16
 // WARNING: 可能会失去精度
 var MarshalJSONWithoutQuotes = false
 
-// Zero constant, to make computations faster.
+// Zero 常量, 使计算更快.
 var Zero = New(0, 1)
 
-// fiveDec used in Cash Rounding
 var fiveDec = New(5, 0)
 var zeroInt = big.NewInt(0)
 var oneInt = big.NewInt(1)
@@ -31,7 +30,7 @@ var fiveInt = big.NewInt(5)
 var tenInt = big.NewInt(10)
 var twentyInt = big.NewInt(20)
 
-// Decimal represents a fixed-point decimal. It is immutable.
+// Decimal表示一个定点小数。它是不可变的。
 // number = value * 10 ^ exp
 type Decimal struct {
 	value *big.Int
