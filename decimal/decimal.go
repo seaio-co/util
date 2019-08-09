@@ -58,13 +58,7 @@ func NewFromBigInt(value *big.Int, exp int32) Decimal {
 	}
 }
 
-// NewFromString returns a new Decimal from a string representation.
-//
-// Example:
-//
-//     d, err := NewFromString("-123.45")
-//     d2, err := NewFromString(".0001")
-//
+// NewFromString 返回一个用string类型表示的new Decimal
 func NewFromString(value string) (Decimal, error) {
 	originalInput := value
 	var intString string
