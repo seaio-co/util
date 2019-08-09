@@ -80,8 +80,7 @@ func NewFromString(value string) (Decimal, error) {
 
 	parts := strings.Split(value, ".")
 	if len(parts) == 1 {
-		// There is no decimal point, we can just parse the original string as
-		// an int
+		// There is no decimal point, we can just parse the original string as an int
 		intString = value
 	} else if len(parts) == 2 {
 		// strip the insignificant digits for more accurate comparisons.
