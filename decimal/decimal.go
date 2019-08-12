@@ -34,8 +34,7 @@ var twentyInt = big.NewInt(20)
 // number = value * 10 ^ exp
 type Decimal struct {
 	value *big.Int
-	// NOTE(vadim): this must be an int32, because we cast it to float64 during
-	// calculations. If exp is 64 bit, we might lose precision.
+	// 注: 必须是int32, 因为计算中将转换为 float64. 如果exp是64位，可能会失去精度。
 	// If we cared about being able to represent every possible decimal, we
 	// could make exp a *big.Int but it would hurt performance and numbers
 	// like that are unrealistic.
