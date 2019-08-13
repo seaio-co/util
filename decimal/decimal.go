@@ -47,7 +47,7 @@ func New(value int64, exp int32) Decimal {
 	}
 }
 
-// NewFromBigInt returns a new Decimal from a big.Int, value * 10 ^ exp
+// NewFromBigInt 返回一个新的big.Int 的decimal, value * 10 ^ exp
 func NewFromBigInt(value *big.Int, exp int32) Decimal {
 	return Decimal{
 		value: big.NewInt(0).Set(value),
