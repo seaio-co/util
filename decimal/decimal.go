@@ -35,11 +35,11 @@ var twentyInt = big.NewInt(20)
 type Decimal struct {
 	value *big.Int
 	// 注: 必须是int32, 因为计算中将转换为 float64. 如果exp是64位，可能会失去精度。
-	// I如果想要表示所有可能的小数, 我们可以把exp做大。但这会损害性能，像这样的数字是不现实的。
+	// 如果想要表示所有可能的小数, 我们可以把exp做大。但这会损害性能，像这样的数字是不现实的。
 	exp int32
 }
 
-// New returns a new fixed-point decimal, value * 10 ^ exp.
+// New 返回一个新的定点decimal, value * 10 ^ exp.
 func New(value int64, exp int32) Decimal {
 	return Decimal{
 		value: big.NewInt(value),
