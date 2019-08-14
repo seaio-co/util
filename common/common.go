@@ -5,7 +5,6 @@ import (
 	"crypto/rand"
 	"encoding/base64"
 	"encoding/hex"
-	"fmt"
 	"io"
 	"reflect"
 	"sync"
@@ -60,13 +59,4 @@ func GenerateUniqueId() string {
 		return ""
 	}
 	return getMd5String(base64.URLEncoding.EncodeToString(b))
-}
-
-// IsUrlErr 判断错误是否为路径错误
-func IsUrlErr(err error) bool {
-	errStr := fmt.Sprintf("%T", err)
-	if errStr == "*url.Error" {
-		return true
-	}
-	return false
 }
