@@ -9,6 +9,7 @@ import (
 	"reflect"
 	"sync"
 	"time"
+	"fmt"
 )
 
 // IsEmpty 判读数据是否为空
@@ -59,4 +60,13 @@ func GenerateUniqueId() string {
 		return ""
 	}
 	return getMd5String(base64.URLEncoding.EncodeToString(b))
+}
+
+// IsUrlErr 判断错误是否为路径错误
+func IsUrlErr(err error) bool {
+	errStr := fmt.Sprintf("%T", err)
+	if errStr == "*url.Error" {
+		return true
+	}
+	return false
 }
