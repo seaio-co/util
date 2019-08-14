@@ -5,11 +5,11 @@ import (
 	"crypto/rand"
 	"encoding/base64"
 	"encoding/hex"
+	"fmt"
 	"io"
 	"reflect"
 	"sync"
 	"time"
-	"fmt"
 )
 
 // IsEmpty 判读数据是否为空
@@ -60,6 +60,18 @@ func GenerateUniqueId() string {
 		return ""
 	}
 	return getMd5String(base64.URLEncoding.EncodeToString(b))
+}
+
+// StructToMap
+func StructToMap(obj interface{}) map[string]interface{} {
+	ty := reflect.TypeOf(obj)
+	v := reflect.ValueOf(obj)
+
+	var data = make(map[string]interface{})
+	for i := 0; i < ty.NumField(); i++ {
+		data[ty.Field(i).Name] = v.Field(i).Interface()
+	}
+	return data
 }
 
 // IsUrlErr 判断错误是否为路径错误
