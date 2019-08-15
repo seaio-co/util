@@ -82,3 +82,26 @@ func IsUrlErr(err error) bool {
 	}
 	return false
 }
+
+// IsUpper 判断是否是大写字母
+func IsUpper(b byte) bool {
+	return 'A' <= b && b <= 'Z'
+}
+
+// IsLower 判断是否是小写字母
+func IsLower(b byte) bool {
+	return 'a' <= b && b <= 'z'
+}
+
+// IsDigit 判断是否是数字
+func IsDigit(b byte) bool {
+	return '0' <= b && b <= '9'
+}
+
+// ToLower 转换为小写字母
+func ToLower(b byte) byte {
+	if IsUpper(b) {
+		return b - 'A' + 'a'
+	}
+	return b
+}
