@@ -2,6 +2,7 @@ package stringutil
 
 import (
 	"crypto/rand"
+	"crypto/subtle"
 	"encoding/hex"
 	"io"
 	"unicode"
@@ -55,4 +56,35 @@ func reverse(runes []rune, length int) {
 // IsMark determines whether the rune is a marker
 func IsMark(r rune) bool {
 	return unicode.Is(unicode.Mn, r) || unicode.Is(unicode.Me, r) || unicode.Is(unicode.Mc, r)
+}
+
+func SecureCompare(given, actual []byte) bool {
+	if subtle.ConstantTimeEq(int32(len(given)), int32(len(actual))) == 1 {
+		if subtle.ConstantTimeCompare(given, actual) == 1 {
+			return true
+		}
+		return false
+	}
+	// Securely compare actual to itself to keep constant time, but always return false
+	if subtle.ConstantTimeCompare(actual, actual) == 1 {
+		return false
+	}
+	return false
+}
+
+func SecureCompareString(given, actual string) bool {
+	// The following code is incorrect:
+	// return SecureCompare([]byte(given), []byte(actual))
+
+	if subtle.ConstantTimeEq(int32(len(given)), int32(len(actual))) == 1 {
+		if subtle.ConstantTimeCompare([]byte(given), []byte(actual)) == 1 {
+			return true
+		}
+		return false
+	}
+	// Securely compare actual to itself to keep constant time, but always return false
+	if subtle.ConstantTimeCompare([]byte(actual), []byte(actual)) == 1 {
+		return false
+	}
+	return false
 }
