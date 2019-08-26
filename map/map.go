@@ -3,7 +3,9 @@ package _map
 import (
 	"math/rand"
 	"sync"
+	"sync/atomic"
 	"time"
+	"unsafe"
 )
 
 // Map is a concurrent map with loads, stores, and deletes.
@@ -310,7 +312,6 @@ func (m *atomicMap) Store(key, value interface{}) {
 				// The entry was previously expunged, which implies that there is a
 				// non-nil dirty map and this entry is not in it.
 				m.dirty[key] = e
-				// @added by henrylee2cn 2017/11/17
 				atomic.AddInt32(&m.length, 1)
 			}
 			e.storeLocked(&value)
@@ -333,8 +334,7 @@ func (m *atomicMap) Store(key, value interface{}) {
 
 // tryStore stores a value if the entry has not been expunged.
 //
-// If the entry is expunged, tryStore returns 0 and leaves the entry
-// unchanged.
+// If the entry is expunged, tryStore returns 0 and leaves the entry unchanged.
 func (e *entry) tryStore(i *interface{}) int8 {
 	p := atomic.LoadPointer(&e.p)
 	if p == expunged {
@@ -356,8 +356,7 @@ func (e *entry) tryStore(i *interface{}) int8 {
 
 // unexpungeLocked ensures that the entry is not marked as expunged.
 //
-// If the entry was previously expunged, it must be added to the dirty map
-// before m.mu is unlocked.
+// If the entry was previously expunged, it must be added to the dirty map before m.mu is unlocked.
 func (e *entry) unexpungeLocked() (wasExpunged bool) {
 	return atomic.CompareAndSwapPointer(&e.p, expunged, nil)
 }
@@ -596,16 +595,13 @@ func (e *entry) tryExpungeLocked() (isExpunged bool) {
 }
 
 // Len returns the length of the map.
-// Note:
-//  the length may be inaccurate.
-// @added by henrylee2cn 2017/11/17
+// Note: the length may be inaccurate.
 func (m *atomicMap) Len() int {
 	return int(atomic.LoadInt32(&m.length))
 }
 
 // Random returns a pair kv randomly.
 // If exist=false, no kv data is exist.
-// @added by henrylee2cn 2017/08/10
 func (m *atomicMap) Random() (key, value interface{}, exist bool) {
 	var (
 		length, i int
