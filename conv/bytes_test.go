@@ -33,3 +33,11 @@ func Test_LeftPadBytes(t *testing.T) {
 	s := LeftPadBytes([]byte("2"), 3)
 	t.Log(s)
 }
+
+func Test_Int2hexbyte(t *testing.T) {
+	t.Log(Int2hexbyte(11))
+}
+
+func Test_HexCharUpper(t *testing.T) {
+	t.Log(HexCharUpper(126))
+}

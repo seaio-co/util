@@ -320,3 +320,19 @@ func LeftPadBytes(slice []byte, l int) []byte {
 
 	return padded
 }
+
+// Int2hexbyte 返回n表示的的16进制对应的ASCII码
+func Int2hexbyte(n int) byte {
+	if n < 10 {
+		return '0' + byte(n)
+	}
+	return 'a' + byte(n) - 10
+}
+
+// HexCharUpper 返回c的ASCII码
+func HexCharUpper(c byte) byte {
+	if c < 10 {
+		return '0' + c
+	}
+	return c - 10 + 'A'
+}
