@@ -204,7 +204,6 @@ type atomicMap struct {
 	// state) and the next store to the map will make a new dirty copy.
 	misses int
 
-	// @added by henrylee2cn 2017/11/17
 	length int32
 }
 
@@ -289,7 +288,7 @@ func (m *atomicMap) Store(key, value interface{}) {
 		case 1:
 			return
 		case 2:
-			// @added by henrylee2cn 2017/11/17
+
 			atomic.AddInt32(&m.length, 1)
 			return
 		}
@@ -303,7 +302,7 @@ func (m *atomicMap) Store(key, value interface{}) {
 			m.mu.Unlock()
 			return
 		case 2:
-			// @added by henrylee2cn 2017/11/17
+
 			atomic.AddInt32(&m.length, 1)
 			m.mu.Unlock()
 			return
@@ -377,7 +376,7 @@ func (m *atomicMap) LoadOrStore(key, value interface{}) (actual interface{}, loa
 	if e, ok := read.m[key]; ok {
 		actual, loaded, ok := e.tryLoadOrStore(value)
 		if ok {
-			// @added by henrylee2cn 2017/11/17
+
 			if !loaded {
 				atomic.AddInt32(&m.length, 1)
 			}
@@ -392,7 +391,7 @@ func (m *atomicMap) LoadOrStore(key, value interface{}) (actual interface{}, loa
 			m.dirty[key] = e
 		}
 		actual, loaded, ok = e.tryLoadOrStore(value)
-		// @added by henrylee2cn 2017/12/01
+
 		if ok && !loaded {
 			atomic.AddInt32(&m.length, 1)
 		}
