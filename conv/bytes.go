@@ -336,3 +336,30 @@ func HexCharUpper(c byte) byte {
 	}
 	return c - 10 + 'A'
 }
+
+// AppendZeroes appends zeroes to the input byte array up until it has length l
+func AppendZeroes(in []byte, l int) []byte {
+	for {
+		if len(in) >= l {
+			return in
+		}
+		in = append(in, 0)
+	}
+}
+
+// SwapByteNibbles swaps the two nibbles of a byte
+func SwapByteNibbles(b byte) byte {
+	b1 := (uint(b) & 240) >> 4
+	b2 := (uint(b) & 15) << 4
+
+	return byte(b1 | b2)
+}
+
+// SwapNibbles swaps the nibbles for each byte in the byte array
+func SwapNibbles(k []byte) []byte {
+	result := make([]byte, len(k))
+	for i, b := range k {
+		result[i] = SwapByteNibbles(b)
+	}
+	return result
+}
