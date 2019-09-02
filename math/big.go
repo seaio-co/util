@@ -117,7 +117,7 @@ func S256(x *big.Int) *big.Int {
 }
 
 // Exp 通过平方实现求幂。
-//  Exp返回一个新分配的大整数，并且不更改基数或指数。结果被截断为256位。
+// Exp返回一个新分配的大整数，并且不更改基数或指数。结果被截断为256位。
 func Exp(base, exponent *big.Int) *big.Int {
 	result := big.NewInt(1)
 

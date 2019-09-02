@@ -117,3 +117,21 @@ func GetStringToFormatUnix(timestr string) int64 {
 	stamp, _ := time.ParseInLocation(timeTemplate, timestr, time.Local) //使用parseInLocation将字符串格式化返回本地时区时间
 	return stamp.Unix()
 }
+
+// Slight modification of the RFC3339Nano but it right pads all zeros and drops the time zone info
+const SortableTimeFormat = "2006-01-02T15:04:05.000000000"
+
+// Formats a time.Time into a []byte that can be sorted
+func FormatTimeBytes(t time.Time) []byte {
+	return []byte(t.UTC().Round(0).Format(SortableTimeFormat))
+}
+
+// Parses a []byte encoded using FormatTimeKey back into a time.Time
+func ParseTimeBytes(bz []byte) (time.Time, error) {
+	str := string(bz)
+	t, err := time.Parse(SortableTimeFormat, str)
+	if err != nil {
+		return t, err
+	}
+	return t.UTC().Round(0), nil
+}
