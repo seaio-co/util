@@ -3,6 +3,7 @@ package time
 import (
 	"fmt"
 	"testing"
+	"time"
 )
 
 //测试当前时间戳(秒级)
@@ -65,4 +66,12 @@ func Test_GetStringToFormatUnix(t *testing.T) {
 	t1 := "2019-01-08 13:50:30" //外部传入的时间字符串
 	s := GetStringToFormatUnix(t1)
 	t.Log(s)
+}
+
+// Test_FormatTimeBytes 测试time与byte[]之间转换
+func Test_FormatTimeBytes(t *testing.T) {
+	s := FormatTimeBytes(time.Now())
+	t.Log("time convert byte[]:", s)
+	b, _ := ParseTimeBytes(s)
+	t.Log("byte[] conv time:", b)
 }
