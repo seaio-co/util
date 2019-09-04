@@ -26,3 +26,7 @@ func TrimSpaceString(src string) string {
 	}
 	return strings.Join(strs, "")
 }
+
+func TrimRightSpace(s string) string {
+	return strings.TrimRight(string(s), "\r\n\t ")
+}
