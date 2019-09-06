@@ -16,3 +16,9 @@ func WriteBytesToFile(filePath string, b []byte) (int, error) {
 	defer fw.Close()
 	return fw.Write(b)
 }
+
+// WriteStringFile saves content type 'string' to file by given path.
+// It returns error when fail to finish operation.
+func WriteStringToFile(filePath string, s string) (int, error) {
+	return WriteBytesToFile(filePath, []byte(s))
+}
