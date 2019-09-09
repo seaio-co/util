@@ -25,6 +25,8 @@ func ReadFileToString(filePath string) (string, error) {
 	return string(b), nil
 }
 
+// ReadFileToStringNoLn 在ReadFileToString基础上去出掉右边\r\n\t符号
+// It returns error when fail to finish operation.
 func ReadFileToStringNoLn(filePath string) (string, error) {
 	str, err := ReadFileToString(filePath)
 	if err != nil {
