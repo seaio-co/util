@@ -15,3 +15,12 @@ func Test_SliceContainsInt(t *testing.T) {
 	in = append(in, 2, 8, 3)
 	t.Log(SliceContainsInt(in, 2))
 }
+
+func Test_SliceMerge(t *testing.T) {
+
+	in := make([]interface{}, 0)
+	in = append(in, 2, 8, 3)
+	in1 := make([]interface{}, 0)
+	in1 = append(in, 2, 8, 3)
+	t.Log(SliceMerge(in, in1))
+}
