@@ -16,6 +16,13 @@ func Test_SliceContainsInt(t *testing.T) {
 	t.Log(SliceContainsInt(in, 2))
 }
 
+func Test_SliceUniqueString(t *testing.T) {
+
+	in := make([]string, 0)
+	in = append(in, "hello", "world")
+	t.Log(SliceUniqueString(in))
+}
+
 func Test_SliceMerge(t *testing.T) {
 
 	in := make([]interface{}, 0)
