@@ -132,3 +132,24 @@ func SliceUniqueString(s []string) []string {
 
 	return ret
 }
+
+func SliceSumInt64(intslice []int64) (sum int64) {
+	for _, v := range intslice {
+		sum += v
+	}
+	return
+}
+
+func SliceSumInt(intslice []int) (sum int) {
+	for _, v := range intslice {
+		sum += v
+	}
+	return
+}
+
+func SliceSumFloat64(intslice []float64) (sum float64) {
+	for _, v := range intslice {
+		sum += v
+	}
+	return
+}
