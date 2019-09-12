@@ -31,3 +31,10 @@ func Test_SliceMerge(t *testing.T) {
 	in1 = append(in, 2, 8, 3)
 	t.Log(SliceMerge(in, in1))
 }
+
+func Test_SliceSumInt64(t *testing.T) {
+
+	in := make([]int64, 0)
+	in = append(in, 2, 8, 3, 5, 7, 0)
+	t.Log(SliceSumInt64(in))
+}
