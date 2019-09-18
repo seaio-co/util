@@ -2,6 +2,8 @@ package common
 
 import (
 	"bytes"
+	"encoding/json"
+	"encoding/xml"
 	"io"
 	"mime/multipart"
 	"net/url"
@@ -90,4 +92,41 @@ func NewFormBody2(values url.Values, files Files) (contentType string, bodyReade
 		pw.Close()
 	}()
 	return bodyWriter.FormDataContentType(), pr
+}
+
+// NewFile creates a file for HTTP form.
+func NewFile(name string, bodyReader io.Reader) File {
+	return &fileReader{name, bodyReader}
+}
+
+// fileReader file name and bytes.
+type fileReader struct {
+	name       string
+	bodyReader io.Reader
+}
+
+func (f *fileReader) Name() string {
+	return f.name
+}
+
+func (f *fileReader) Read(p []byte) (int, error) {
+	return f.bodyReader.Read(p)
+}
+
+// NewJSONBody returns JSON request content type and body reader.
+func NewJSONBody(v interface{}) (contentType string, bodyReader io.Reader, err error) {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return
+	}
+	return "application/json;charset=utf-8", bytes.NewReader(b), nil
+}
+
+// NewXMLBody returns XML request content type and body reader.
+func NewXMLBody(v interface{}) (contentType string, bodyReader io.Reader, err error) {
+	b, err := xml.Marshal(v)
+	if err != nil {
+		return
+	}
+	return "application/xml;charset=utf-8", bytes.NewReader(b), nil
 }
