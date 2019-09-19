@@ -1,7 +1,9 @@
 package file
 
 import (
+	"bytes"
 	"errors"
+	"github.com/seaio-co/util/stringutil"
 	"io/ioutil"
 	"os"
 	"path"
@@ -161,4 +163,44 @@ func FilesUnder(dirPath string) ([]string, error) {
 
 	return ret, nil
 
+}
+
+// RewriteFile rewrites the file.
+func RewriteFile(filename string, fn func(content []byte) (newContent []byte, err error)) error {
+	f, err := os.OpenFile(filename, os.O_RDWR, 0777)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+	content, err := ioutil.ReadAll(f)
+	if err != nil {
+		return err
+	}
+	newContent, err := fn(content)
+	if err != nil {
+		return err
+	}
+	if bytes.Equal(content, newContent) {
+		return nil
+	}
+	f.Seek(0, 0)
+	f.Truncate(0)
+	_, err = f.Write(newContent)
+	return err
+}
+
+// ReplaceFile replaces the bytes selected by [start, end] with the new content.
+func ReplaceFile(filename string, start, end int, newContent string) error {
+	if start < 0 || (end >= 0 && start > end) {
+		return nil
+	}
+	return RewriteFile(filename, func(content []byte) ([]byte, error) {
+		if end < 0 || end > len(content) {
+			end = len(content)
+		}
+		if start > end {
+			start = end
+		}
+		return bytes.Replace(content, content[start:end], stringutil.StringToBytes(newContent), 1), nil
+	})
 }
