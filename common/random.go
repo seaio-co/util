@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"crypto/rand"
 	"encoding/base64"
+	"github.com/seaio-co/util/stringutil"
+	mrand "math/rand"
 )
 
 // NewRandom creates a new padded Encoding defined by the given alphabet string.
@@ -32,12 +34,36 @@ type Random struct {
 	substituteLen int
 }
 
+// RandomString returns a base64 encoded securely generated
+// random string. It will panic if the system's secure random number generator
+// fails to function correctly.
+// The length n must be an integer multiple of 4, otherwise the last character will be padded with `=`.
+func (r *Random) RandomString(n int) string {
+	d := r.encoding.DecodedLen(n)
+	buf := make([]byte, n)
+	r.encoding.Encode(buf, RandomBytes(d))
+	for k, v := range buf {
+		if v == 0x00 {
+			buf[k] = r.substitute[mrand.Intn(r.substituteLen)]
+		}
+	}
+	return stringutil.BytesToString(buf)
+}
+
 const urlEncoder = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_"
 
 var urlRandom = &Random{
 	encoding:      base64.URLEncoding,
 	substitute:    []byte(urlEncoder),
 	substituteLen: len(urlEncoder),
+}
+
+// URLRandomString returns a URL-safe, base64 encoded securely generated
+// random string. It will panic if the system's secure random number generator
+// fails to function correctly.
+// The length n must be an integer multiple of 4, otherwise the last character will be padded with `=`.
+func URLRandomString(n int) string {
+	return urlRandom.RandomString(n)
 }
 
 // RandomBytes returns securely generated random bytes. It will panic
