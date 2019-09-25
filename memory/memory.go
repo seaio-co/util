@@ -1,11 +1,15 @@
 // Package memory 该文件主要是关于虚拟机内存的一些操作
 package memory
 
-import "fmt"
+import (
+	"fmt"
+	"sync"
+)
 
 // Memory 内存用于一些内存操作（MLOAD,MSTORE,MSTORE8）及合约调用的参数拷贝（CALL，CALLCODE）
 // 内存数据结构，维护了一个byte数组，MLOAD，MSTORE读取存入的时候都要指定位置及长度才能准确的读写
 type Memory struct {
+	sync.Mutex
 	store []byte
 }
 
@@ -93,4 +97,13 @@ func (m *Memory) Print() {
 		fmt.Println("-- empty --")
 	}
 	fmt.Println("####################")
+}
+
+func (m *Memory) Path() string {
+	return ""
+}
+
+// 关闭数据库(因内存数据库无需此操作，只做实现chaindb.Database的表示形式)
+func (m *Memory) Close() error {
+	return nil
 }
