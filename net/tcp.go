@@ -7,22 +7,22 @@ import (
 	"net"
 )
 
-// Client holds info about connection
+// Client
 type Client struct {
 	conn   net.Conn
 	Server *server
 }
 
-// TCP server
+// server
 type server struct {
-	address                  string // Address to open connection: localhost:9999
+	address                  string
 	config                   *tls.Config
 	onNewClientCallback      func(c *Client)
 	onClientConnectionClosed func(c *Client, err error)
 	onNewMessage             func(c *Client, message string)
 }
 
-// Read client data from channel
+// listen
 func (c *Client) listen() {
 	c.Server.onNewClientCallback(c)
 	reader := bufio.NewReader(c.conn)
@@ -37,42 +37,44 @@ func (c *Client) listen() {
 	}
 }
 
-// Send text message to client
+// Send
 func (c *Client) Send(message string) error {
 	_, err := c.conn.Write([]byte(message))
 	return err
 }
 
-// Send bytes to client
+// SendBytes
 func (c *Client) SendBytes(b []byte) error {
 	_, err := c.conn.Write(b)
 	return err
 }
 
+// Conn
 func (c *Client) Conn() net.Conn {
 	return c.conn
 }
 
+// Close
 func (c *Client) Close() error {
 	return c.conn.Close()
 }
 
-// Called right after server starts listening new client
+// OnNewClient
 func (s *server) OnNewClient(callback func(c *Client)) {
 	s.onNewClientCallback = callback
 }
 
-// Called right after connection closed
+// OnClientConnectionClosed
 func (s *server) OnClientConnectionClosed(callback func(c *Client, err error)) {
 	s.onClientConnectionClosed = callback
 }
 
-// Called when Client receives new message
+// OnNewMessage
 func (s *server) OnNewMessage(callback func(c *Client, message string)) {
 	s.onNewMessage = callback
 }
 
-// Listen starts network server
+// Listen
 func (s *server) Listen() {
 	var listener net.Listener
 	var err error
@@ -96,7 +98,7 @@ func (s *server) Listen() {
 	}
 }
 
-// Creates new tcp server instance
+// New
 func New(address string) *server {
 	log.Println("Creating server with address", address)
 	server := &server{
@@ -111,6 +113,7 @@ func New(address string) *server {
 	return server
 }
 
+// NewWithTLS
 func NewWithTLS(address string, certFile string, keyFile string) *server {
 	log.Println("Creating server with address", address)
 	cert, _ := tls.LoadX509KeyPair(certFile, keyFile)
