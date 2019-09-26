@@ -45,3 +45,31 @@ func RandomArray(n int) []int {
 	}
 	return arr
 }
+
+func bubbleSort(arr []int) []int {
+	for i := 0; i < len(arr)-1; i++ {
+		for j := 0; j < len(arr)-1; j++ {
+			if arr[j+1] < arr[j] {
+				arr[j], arr[j+1] = arr[j+1], arr[j]
+			}
+		}
+	}
+	return arr
+}
+
+func bubbleSortb(arr []int) []int {
+	var flag bool
+	for i := 0; i < len(arr)-1; i++ {
+		flag = false
+		for j := 0; j < len(arr)-1; j++ {
+			if arr[j+1] < arr[j] {
+				arr[j], arr[j+1] = arr[j+1], arr[j]
+				flag=true
+			}
+		}
+		if !flag {
+			break
+		}
+	}
+	return arr
+}
