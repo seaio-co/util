@@ -1,4 +1,3 @@
-// Package math 关于 math integer 的数学工具包
 package math
 
 import (
@@ -7,7 +6,7 @@ import (
 	"math/big"
 )
 
-// Various 各种大整数极限值
+// Various
 var (
 	tt255     = BigPow(2, 255)
 	tt256     = BigPow(2, 256)
