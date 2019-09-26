@@ -2,6 +2,8 @@ package math
 
 import (
 	"math/rand"
+	"time"
+	"fmt"
 )
 
 // QuickSort 实现快速排序int[]
@@ -72,4 +74,39 @@ func bubbleSortb(arr []int) []int {
 		}
 	}
 	return arr
+}
+
+// shuffle
+func shuffle(arr []int){
+	rand.Seed(time.Now().UnixNano())
+	var i, j int
+	var temp int
+	for i = len(arr) - 1; i > 0; i-- {
+		j = rand.Intn(i + 1)
+		temp = arr[i]
+		arr[i] = arr[j]
+		arr[j] = temp
+	}
+}
+
+func randomMoney(remainCount, remainMoney int)int{
+	if remainCount == 1{
+		return remainMoney
+	}
+
+	rand.Seed(time.Now().UnixNano())
+
+	var min = 1
+	max := remainMoney / remainCount * 2
+	money := rand.Intn(max) + min
+	return money
+}
+
+// redPackage
+func redPackage(count, money int)  {
+	for i := 0; i < count; i++ {
+		m := randomMoney(count - i, money)
+		fmt.Printf("%d  ",  m)
+		money -= m
+	}
 }
