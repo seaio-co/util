@@ -26,19 +26,15 @@ func TestServiceMethod(t *testing.T) {
 		if err != nil && test.err == true {
 			continue
 		}
-		// unexpected error
 		if err != nil && test.err == false {
 			t.Fatalf("unexpected err %v for %+v", err, test)
 		}
-		// expecter error
 		if test.err == true && err == nil {
 			t.Fatalf("expected error for %+v: got service: %s method: %s", test, service, method)
 		}
-
 		if service != test.service {
 			t.Fatalf("wrong service for %+v: got service: %s method: %s", test, service, method)
 		}
-
 		if method != test.method {
 			t.Fatalf("wrong method for %+v: got service: %s method: %s", test, service, method)
 		}
