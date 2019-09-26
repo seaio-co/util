@@ -1,7 +1,6 @@
 package stringutil
 
 import (
-	"unicode"
 	"unicode/utf8"
 )
 
@@ -18,11 +17,6 @@ func WordCount(str string) int {
 	for len(str) > 0 {
 		r, size = utf8.DecodeRuneInString(str)
 		switch {
-		case isAlphabet(r):
-			if !inWord {
-				inWord = true
-				n++
-			}
 		case inWord && (r == '\'' || r == '-'):
 		default:
 			inWord = false
@@ -31,27 +25,6 @@ func WordCount(str string) int {
 		str = str[size:]
 	}
 	return n
-}
-
-const minCJKCharacter = '\u3400'
-
-// Checks r is a letter but not CJK character.
-func isAlphabet(r rune) bool {
-	if !unicode.IsLetter(r) {
-		return false
-	}
-
-	switch {
-	case r < minCJKCharacter:
-		return true
-	case r >= '\u4E00' && r <= '\u9FCC':
-		return false
-	case r >= '\u3400' && r <= '\u4D85':
-		return false
-	case r >= '\U00020000' && r <= '\U0002B81D':
-		return false
-	}
-	return true
 }
 
 // Width
