@@ -1,19 +1,3 @@
-/*
-Copyright 2014 The Kubernetes Authors.
-
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
-
-    http://www.apache.org/licenses/LICENSE-2.0
-
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
-*/
-
 package stringutil
 
 import (
@@ -21,8 +5,19 @@ import (
 	"strings"
 )
 
-// SplitQualifiedName Splits a fully qualified name and returns its namespace and name.
-// Assumes that the input 'str' has been validated.
+// Reversed
+func Reversed(str string) string {
+	sr := []rune{}
+	s1 := []rune(str)
+	lens := len(s1)
+
+	for i:=lens-1;i>=0;i-- {
+		sr = append(sr,s1[i])
+	}
+	return string(sr)
+}
+
+// SplitQualifiedName
 func SplitQualifiedName(str string) (string, string) {
 	parts := strings.Split(str, "/")
 	if len(parts) < 2 {
@@ -31,13 +26,12 @@ func SplitQualifiedName(str string) (string, string) {
 	return parts[0], parts[1]
 }
 
-// JoinQualifiedName joins 'namespace' and 'name' and returns a fully qualified name
-// Assumes that the input is valid.
+// JoinQualifiedName
 func JoinQualifiedName(namespace, name string) string {
 	return path.Join(namespace, name)
 }
 
-// ShortenString returns the first N slice of a string.
+// ShortenString
 func ShortenString(str string, n int) string {
 	if len(str) <= n {
 		return str
