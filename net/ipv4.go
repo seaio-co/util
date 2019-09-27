@@ -2,6 +2,7 @@ package net
 
 import (
 	"net"
+	"strings"
 )
 
 // IPv4List 获取本机的 ipv4 列表.
@@ -41,4 +42,18 @@ func IPv4List() ([]net.IP, error) {
 		}
 	}
 	return ipv4List, nil
+}
+
+func IsIPv4(s string) bool {
+	var ipany net.IP
+	if strings.IndexByte(s, '/') != -1 {
+		ip, _ /*mask*/, err := net.ParseCIDR(s)
+		if err != nil {
+			return false
+		}
+		ipany = ip
+	} else {
+		ipany = net.ParseIP(s)
+	}
+	return ipany != nil && ipany.To4() != nil
 }
