@@ -24,7 +24,7 @@ func BubbleSort(buf []int) []int {
 }
 
 // SelectSort
-func SelectSort(buf []int) {
+func SelectSort(buf []int) []int {
 	times := 0
 	for i := 0; i < len(buf)-1; i++ {
 		min := i
@@ -40,5 +40,23 @@ func SelectSort(buf []int) {
 			buf[min] = tmp
 		}
 	}
-	fmt.Println("xuanze times: ", times)
+	return buf
+}
+
+// InsertSort
+func InsertSort(buf []int) []int {
+	times := 0
+	for i := 1; i < len(buf); i++ {
+		for j := i; j > 0; j-- {
+			if buf[j] < buf[j-1] {
+				times++
+				tmp := buf[j-1]
+				buf[j-1] = buf[j]
+				buf[j] = tmp
+			} else {
+				break
+			}
+		}
+	}
+	return buf
 }
