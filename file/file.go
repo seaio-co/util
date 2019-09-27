@@ -8,6 +8,8 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"net/http"
+	"io"
 )
 
 // SelfPath gets compiled executable file absolute path
@@ -203,4 +205,16 @@ func ReplaceFile(filename string, start, end int, newContent string) error {
 		}
 		return bytes.Replace(content, content[start:end], stringutil.StringToBytes(newContent), 1), nil
 	})
+}
+
+func uploadHandler(w http.ResponseWriter, r *http.Request) {
+	file, err := os.Create("./newFile")
+	if err != nil {
+		panic(err)
+	}
+	_, err = io.Copy(file, r.Body)
+	if err != nil {
+		panic(err)
+	}
+	w.Write([]byte("upload success"))
 }
