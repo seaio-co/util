@@ -1,7 +1,5 @@
 package math
 
-import "fmt"
-
 // BubbleSort
 func BubbleSort(buf []int) []int {
 	times := 0
