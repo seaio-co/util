@@ -21,7 +21,6 @@ func BubbleSort(buf []int) []int {
 	return buf
 }
 
-<<<<<<< HEAD
 // BinarySearch
 func BinarySearch(nums []int,left,right,val int) int {
 	k := (left+right)/2
@@ -35,15 +34,16 @@ func BinarySearch(nums []int,left,right,val int) int {
 }
 
 // FibonacciRecursion
-func FibonacciRecursion(n int)int{
-	if n==0 {
+func FibonacciRecursion(n int) int {
+	if n == 0 {
 		return 0
-	}else if n==1 {
+	} else if n == 1 {
 		return 1
-	}else{
-		return FibonacciRecursion(n-1)+FibonacciRecursion(n-2)
+	} else {
+		return FibonacciRecursion(n-1) + FibonacciRecursion(n-2)
 	}
-=======
+}
+
 // SelectSort
 func SelectSort(buf []int) []int {
 	times := 0
@@ -80,5 +80,4 @@ func InsertSort(buf []int) []int {
 		}
 	}
 	return buf
->>>>>>> e07188dc9aa43f4d420037df7c7d6d4ad99cf0fc
 }
