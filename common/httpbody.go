@@ -11,10 +11,7 @@ import (
 	"strings"
 )
 
-// NewFormBody returns form request content type and body reader.
-// NOTE:
-//  @values format: <fieldName,[value]>
-//  @files format: <fieldName,[fileName]>
+// NewFormBody
 func NewFormBody(values, files url.Values) (contentType string, bodyReader io.Reader, err error) {
 	if len(files) == 0 {
 		return "application/x-www-form-urlencoded", strings.NewReader(values.Encode()), nil
@@ -51,23 +48,14 @@ func NewFormBody(values, files url.Values) (contentType string, bodyReader io.Re
 }
 
 type (
-	// Files maps a string key to a list of files.
 	Files map[string][]File
-	// File interface for form.
 	File interface {
-		// Name returns the name of the file as presented to Open.
 		Name() string
-		// Read reads up to len(b) bytes from the File.
-		// It returns the number of bytes read and any error encountered.
-		// At end of file, Read returns 0, io.EOF.
 		Read(p []byte) (n int, err error)
 	}
 )
 
-// NewFormBody2 returns form request content type and body reader.
-// NOTE:
-//  @values format: <fieldName,[value]>
-//  @files format: <fieldName,[File]>
+// NewFormBody2
 func NewFormBody2(values url.Values, files Files) (contentType string, bodyReader io.Reader) {
 	if len(files) == 0 {
 		return "application/x-www-form-urlencoded", strings.NewReader(values.Encode())
