@@ -10,6 +10,8 @@ import (
 	"reflect"
 	"sync"
 	"time"
+	"regexp"
+	"net"
 )
 
 // IsEmpty 判读数据是否为空
@@ -151,4 +153,26 @@ func DisplaySize(raw float64) string {
 	}
 
 	return "TooLarge"
+}
+
+// Regular 校验参数是否为正整数或浮点数
+func Regular(data string) bool {
+	pattern := `^\d+$ |^(\d+)(\.\d+)?$`
+	reg := regexp.MustCompile(pattern)
+	s := reg.FindAllStringSubmatch(data, -1)
+	if len(s) != 0 {
+		return true
+	}
+	return false
+}
+
+// PingHost 节点测试是否Ping通方法
+func PingHost(host string) bool {
+	d := net.Dialer{Timeout: time.Second * 10, LocalAddr: &net.TCPAddr{}}
+	_, err := d.Dial("tcp", host)
+	//defer conn.Close()
+	if err != nil {
+		return false
+	}
+	return true
 }
