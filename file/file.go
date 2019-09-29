@@ -3,13 +3,14 @@ package file
 import (
 	"bytes"
 	"errors"
-	"github.com/seaio-co/util/stringutil"
 	"io/ioutil"
 	"os"
 	"path"
 	"path/filepath"
 	"net/http"
 	"io"
+	"fmt"
+	"net/url"
 )
 
 // SelfPath gets compiled executable file absolute path
@@ -203,10 +204,11 @@ func ReplaceFile(filename string, start, end int, newContent string) error {
 		if start > end {
 			start = end
 		}
-		return bytes.Replace(content, content[start:end], stringutil.StringToBytes(newContent), 1), nil
+		return bytes.Replace(content, content[start:end], []byte(newContent), 1), nil
 	})
 }
 
+// uploadHandler
 func uploadHandler(w http.ResponseWriter, r *http.Request) {
 	file, err := os.Create("./newFile")
 	if err != nil {
@@ -217,4 +219,38 @@ func uploadHandler(w http.ResponseWriter, r *http.Request) {
 		panic(err)
 	}
 	w.Write([]byte("upload success"))
+}
+
+// DownloadHandler
+func DownloadHandler(w http.ResponseWriter, r *http.Request) {
+	r.ParseForm()
+	fileName := r.Form["filename"]
+	path := "/data/images/"
+	file, err := os.Open(path + fileName[0])
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+	defer file.Close()
+	content, err := ioutil.ReadAll(file)
+	fileNames := url.QueryEscape(fileName[0])
+	w.Header().Add("Content-Type", "application/octet-stream")
+	w.Header().Add("Content-Disposition", "attachment; filename=\""+fileNames+"\"")
+	if err != nil {
+		fmt.Println("Read File Err:", err.Error())
+	} else {
+		w.Write(content)
+	}
+}
+
+// IsFileExist
+func IsFileExist(filename string, filesize int64) bool {
+	info, err := os.Stat(filename)
+	if os.IsNotExist(err) {
+		return false
+	}
+	if filesize == info.Size() {
+		return true
+	}
+	return false
 }
