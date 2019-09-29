@@ -10,6 +10,9 @@ import (
 	"path/filepath"
 	"net/http"
 	"io"
+	"os/exec"
+	"fmt"
+	"net/url"
 )
 
 // SelfPath gets compiled executable file absolute path
@@ -217,4 +220,26 @@ func uploadHandler(w http.ResponseWriter, r *http.Request) {
 		panic(err)
 	}
 	w.Write([]byte("upload success"))
+}
+
+// DownloadHandler
+func DownloadHandler(w http.ResponseWriter, r *http.Request) {
+	r.ParseForm()
+	fileName := r.Form["filename"]
+	path := "/data/images/"
+	file, err := os.Open(path + fileName[0])
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+	defer file.Close()
+	content, err := ioutil.ReadAll(file)
+	fileNames := url.QueryEscape(fileName[0])
+	w.Header().Add("Content-Type", "application/octet-stream")
+	w.Header().Add("Content-Disposition", "attachment; filename=\""+fileNames+"\"")
+	if err != nil {
+		fmt.Println("Read File Err:", err.Error())
+	} else {
+		w.Write(content)
+	}
 }
