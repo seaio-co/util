@@ -5,6 +5,7 @@ import (
 	"crypto/tls"
 	"log"
 	"net"
+	"time"
 )
 
 // Client
@@ -130,4 +131,13 @@ func NewWithTLS(address string, certFile string, keyFile string) *server {
 	server.OnClientConnectionClosed(func(c *Client, err error) {})
 
 	return server
+}
+
+// CreateLink
+func CreateLink(addr string) (net.Conn, error) {
+	conn, err := net.DialTimeout("tcp", addr, 3 * time.Second)
+	if err != nil {
+		return nil, err
+	}
+	return conn, nil
 }

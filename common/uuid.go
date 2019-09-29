@@ -9,13 +9,9 @@ import (
 	"strings"
 )
 
-// UUID represent a universal identifier with 16 octets.
+// UUID
 type UUID [16]byte
 
-// regex for validating that the UUID matches RFC 4122.
-// This package generates version 4 UUIDs but
-// accepts any UUID version.
-// http://www.ietf.org/rfc/rfc4122.txt
 var (
 	block1 = "[0-9a-f]{8}"
 	block2 = "[0-9a-f]{4}"
@@ -81,7 +77,6 @@ func (uuid UUID) Raw() [16]byte {
 }
 
 // String returns a hexadecimal string representation with
-// standardized separators.
 func (uuid UUID) String() string {
 	return fmt.Sprintf("%x-%x-%x-%x-%x", uuid[0:4], uuid[4:6], uuid[6:8], uuid[8:10], uuid[10:16])
 }

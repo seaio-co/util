@@ -11,7 +11,6 @@ import (
 
 // TarGz compresses and archives tar.gz file.
 func TarGz(src, dst string, includePrefix bool, logOutput func(string, ...interface{}), ignoreElem ...string) (err error) {
-	// Create dst file
 	fw, err := os.Create(dst)
 	if err != nil {
 		return
@@ -69,11 +68,7 @@ func TarGzTo(src string, dstWriter io.Writer, includePrefix bool, logOutput func
 			return err
 		}
 
-		// Because hdr.Name is base name,
-		// once packaged, all files will pile up and destroy the original directory structure.
 		hdr.Name = strings.TrimPrefix(fileName, prefix)
-
-		// ignore files
 		for _, v := range ignoreElem {
 			if hdr.Name == v ||
 				strings.HasPrefix(hdr.Name, v+separator) ||
@@ -83,12 +78,10 @@ func TarGzTo(src string, dstWriter io.Writer, includePrefix bool, logOutput func
 			}
 		}
 
-		// If it is not a standard file, it will not be processed, such as a directory.
 		if !fi.Mode().IsRegular() {
 			return nil
 		}
 
-		// write file infomation
 		if err := tw.WriteHeader(hdr); err != nil {
 			return err
 		}
