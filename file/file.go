@@ -3,7 +3,6 @@ package file
 import (
 	"bytes"
 	"errors"
-	"github.com/seaio-co/util/stringutil"
 	"io/ioutil"
 	"os"
 	"path"
@@ -206,10 +205,11 @@ func ReplaceFile(filename string, start, end int, newContent string) error {
 		if start > end {
 			start = end
 		}
-		return bytes.Replace(content, content[start:end], stringutil.StringToBytes(newContent), 1), nil
+		return bytes.Replace(content, content[start:end], []byte(newContent), 1), nil
 	})
 }
 
+// uploadHandler
 func uploadHandler(w http.ResponseWriter, r *http.Request) {
 	file, err := os.Create("./newFile")
 	if err != nil {
@@ -222,6 +222,7 @@ func uploadHandler(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte("upload success"))
 }
 
+<<<<<<< HEAD
 // DownloadHandler
 func DownloadHandler(w http.ResponseWriter, r *http.Request) {
 	r.ParseForm()
@@ -242,4 +243,16 @@ func DownloadHandler(w http.ResponseWriter, r *http.Request) {
 	} else {
 		w.Write(content)
 	}
+=======
+// IsFileExist
+func IsFileExist(filename string, filesize int64) bool {
+	info, err := os.Stat(filename)
+	if os.IsNotExist(err) {
+		return false
+	}
+	if filesize == info.Size() {
+		return true
+	}
+	return false
+>>>>>>> b4868f5de891963ff93103d5afda417c7f8fed11
 }
