@@ -1,46 +1,21 @@
 package file
 
-/*
-Copyright 2017 The Kubernetes Authors.
-
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
-
-    http://www.apache.org/licenses/LICENSE-2.0
-
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
-*/
 import (
 	"errors"
 	"os"
+	"io/ioutil"
 )
 
-// LinkTreatment is the base type for constants used by Exists that indicate
-// how symlinks are treated for existence checks.
 type LinkTreatment int
 
 const (
-	// CheckFollowSymlink follows the symlink and verifies that the target of
-	// the symlink exists.
 	CheckFollowSymlink LinkTreatment = iota
-
-	// CheckSymlinkOnly does not follow the symlink and verfies only that they
-	// symlink itself exists.
 	CheckSymlinkOnly
 )
 
-// ErrInvalidLinkTreatment indicates that the link treatment behavior requested
-// is not a valid behavior.
 var ErrInvalidLinkTreatment = errors.New("unknown link behavior")
 
-// Exists checks if specified file, directory, or symlink exists. The behavior
-// of the test depends on the linkBehaviour argument. See LinkTreatment for
-// more details.
+// Exists
 func Exists(linkBehavior LinkTreatment, filename string) (bool, error) {
 	var err error
 
@@ -60,8 +35,7 @@ func Exists(linkBehavior LinkTreatment, filename string) (bool, error) {
 	return true, nil
 }
 
-// ReadDirNoStat returns a string of files/directories contained
-// in dirname without calling lstat on them.
+// ReadDirNoStat
 func ReadDirNoStat(dirname string) ([]string, error) {
 	if dirname == "" {
 		dirname = "."
@@ -74,4 +48,18 @@ func ReadDirNoStat(dirname string) ([]string, error) {
 	defer f.Close()
 
 	return f.Readdirnames(-1)
+}
+
+// ListAllFileByName
+func ListAllFileByName(level int, pathSeparator string, fileDir string) []string {
+	files, _ := ioutil.ReadDir(fileDir)
+	fileList := make([]string, 0)
+	for _, onefile := range files {
+		if (onefile.IsDir()) {
+			ListAllFileByName(level+1, pathSeparator, fileDir+pathSeparator+onefile.Name())
+		} else {
+			fileList = append(fileList, onefile.Name())
+		}
+	}
+	return fileList
 }
