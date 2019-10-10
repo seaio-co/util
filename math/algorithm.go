@@ -104,3 +104,19 @@ func ShellSort(arr []int) []int {
 	}
 	return arr
 }
+
+// FibonacciFind
+func FibonacciFind(n int)int{
+	x,y,fib := 0,1,0
+	for i:=0;i<=n;i++{
+		if i==0 {
+			fib=0
+		}else if i== 1{
+			fib = x+y
+		}else{
+			fib=x+y
+			x,y = y,fib
+		}
+	}
+	return fib
+}
