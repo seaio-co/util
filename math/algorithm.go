@@ -1,5 +1,7 @@
 package math
 
+import "math"
+
 // BubbleSort
 func BubbleSort(buf []int) []int {
 	times := 0
@@ -126,4 +128,40 @@ func Reverse(s []int) {
 	for i, j := 0, len(s) -1 ; i < j; i, j = i+1, j-1 {
 		s[i], s[j] = s[j], s[i]
 	}
+}
+
+func binarySearch(arr []int,  k int) int {
+	left, right, mid := 1, len(arr), 0
+	for {
+		mid = int(math.Floor(float64((left + right) / 2)))
+		if arr[mid] > k {
+			right = mid - 1
+		} else if arr[mid] < k {
+			left = mid + 1
+		} else {
+			break
+		}
+		if left > right {
+			mid = -1
+			break
+		}
+	}
+	return mid
+}
+
+func binarySearch2(sortedArray []int, lookingFor int) int {
+	var low int = 0
+	var high int = len(sortedArray) - 1
+	for low <= high {
+		var mid int =low + (high - low)/2
+		var midValue int = sortedArray[mid]
+		if midValue == lookingFor {
+			return mid
+		} else if midValue > lookingFor {
+			high = mid -1
+		} else {
+			low = mid + 1
+		}
+	}
+	return -1
 }
