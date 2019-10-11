@@ -165,3 +165,36 @@ func binarySearch2(sortedArray []int, lookingFor int) int {
 	}
 	return -1
 }
+
+
+func binarySearch3(arr []int, k int) int {
+	low := 0
+	high := len(arr) - 1
+	for low <= high {
+		mid := low + (high-low)>>1
+		if k < arr[mid] {
+			high = mid - 1
+		} else if k > arr[mid] {
+			low = mid + 1
+		} else {
+			return mid
+		}
+	}
+	return -1
+}
+
+func binarySearch4(arr []int, k int) int {
+	low := 0
+	high := len(arr) - 1
+	for low <= high {
+		mid := low & high  + (low ^ high) >> 1
+		if k < arr[mid] {
+			high = mid - 1
+		} else if k > arr[mid] {
+			low = mid + 1
+		} else {
+			return mid
+		}
+	}
+	return -1
+}
