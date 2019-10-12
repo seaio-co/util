@@ -10,7 +10,7 @@ type Block struct {
 	Version      int64
 	PreBlockHash []byte
 	Hash         []byte
-	TimeStamp    int64
+	TimeStamp    int64 //time
 	TargetBits   int64
 	Nonce int64
 	MerkelRoot []byte
