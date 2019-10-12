@@ -5,7 +5,7 @@ import (
 	"time"
 )
 
-// CurrentSecond 当前时间戳(秒级) timestamp
+// CurrentSecond 当前时间戳(秒级)time
 func CurrentSecond() int64 {
 	return time.Now().Unix()
 }
