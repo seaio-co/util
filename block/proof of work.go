@@ -1,13 +1,4 @@
 package block
-import (
-	"bytes"
-	"crypto/sha256"
-	"fmt"
-	"math"
-	"math/big"
-)
-
-package main
 
 import (
 "bytes"
