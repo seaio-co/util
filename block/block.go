@@ -1,47 +1,33 @@
-package block
+package main
 
 import (
-	"bytes"
-	"crypto/sha256"
 	"time"
 )
 
 type Block struct {
-	Version      int64
-	PreBlockHash []byte
-	Hash         []byte
-	TimeStamp    int64 //times
-	TargetBits   int64
-	Nonce int64
-	MerkelRoot []byte
-	Data []byte
+	Timestamp     int64
+	PrevBlockHash []byte
+	Hash          []byte
+	Data          []byte
+	Nonce         int
 }
+
 func NewBlock(data string, prevBlockHash []byte) *Block {
-	//initial block data
 	block := &Block{
-		Version:1,
-		PreBlockHash:prevBlockHash,
-		//Hash:[]
-		TimeStamp:time.Now().Unix(),
-		TargetBits:10,
-		Nonce:5,
-		MerkelRoot:[]byte{},
-		Data:[]byte(data),
-	}
-	block.SetHash() //get block hash
+		Timestamp:     time.Now().Unix(),
+		PrevBlockHash: prevBlockHash,
+		Hash:          []byte{},
+		Data:          []byte(data),
+		Nonce:         0}
+	pow := NewProofOfWork(block)
+	nonce, hash := pow.Run()
+
+	block.Hash = hash[:]
+	block.Nonce = nonce
+
 	return block
 }
 
-func (block *Block)SetHash()  {
-	tmp := [][]byte{
-		IntToByte(block.Version),
-		block.PreBlockHash,
-		IntToByte(block.TimeStamp),
-		block.MerkelRoot,
-		IntToByte(block.Nonce),
-		block.Data,
-	}
-	data := bytes.Join(tmp, []byte{})
-	hash := sha256.Sum256(data)
-	block.Hash = hash[:]
+func NewGenesisBlock() *Block {
+	return NewBlock("Genesis Block", []byte{})
 }
