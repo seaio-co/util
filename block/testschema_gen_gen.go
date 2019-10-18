@@ -1,61 +1,32 @@
-package bench
-
+package gen
 import (
-	"github.com/tinylib/msgp/msgp"
+	"fmt"
+	"testing"
 )
 
-// DecodeMsg implements msgp.Decodable
-func (z *A) DecodeMsg(dc *msgp.Reader) (err error) {
-	var field []byte
-	_ = field
-	var isz uint32
-	isz, err = dc.ReadMapHeader()
-	if err != nil {
-		return
+//output the seriserialized and eserialized test data
+func TestGencode(t *testing.T) {
+	p:= Block {
+		ParentHash: "parentHash",
+		Hash: "currentHash",
+		Number:100,
+		Timestamp:512,
 	}
-	for isz > 0 {
-		isz--
-		field, err = dc.ReadMapKeyPtr()
-		if err != nil {
-			return
-		}
-		switch msgp.UnsafeString(field) {
-		case "Name":
-			z.Name, err = dc.ReadString()
-			if err != nil {
-				return
-			}
-		case "BirthDay":
-			z.BirthDay, err = dc.ReadInt64()
-			if err != nil {
-				return
-			}
-		case "Phone":
-			z.Phone, err = dc.ReadString()
-			if err != nil {
-				return
-			}
-		case "Siblings":
-			z.Siblings, err = dc.ReadInt64()
-			if err != nil {
-				return
-			}
-		case "Spouse":
-			z.Spouse, err = dc.ReadUint8()
-			if err != nil {
-				return
-			}
-		case "Money":
-			z.Money, err = dc.ReadFloat64()
-			if err != nil {
-				return
-			}
-		default:
-			err = dc.Skip()
-			if err != nil {
-				return
-			}
-		}
+	buf, _ := p.Marshal(nil)
+	fmt.Println("serialized data:",buf)
+	s1:=Block{}
+	s1.Unmarshal(buf)
+	fmt.Println("Deserialized data:" ,s1)
+}
+
+//Output the Size of the test data
+func TestGencodeSize(t *testing.T) {
+	p:= Block {
+		ParentHash: "parentHash",
+		Hash: "currentHash",
+		Number:100,
+		Timestamp:512,
 	}
-	return
+	buf, _ := p.Marshal(nil)
+	fmt.Printf("Gencode encoded size: %v\n", len(buf))
 }
