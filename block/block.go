@@ -15,7 +15,6 @@ type Block struct {
 	Nonce         int
 }
 
-// 将 Block 序列化为一个字节数组
 func (b *Block) Serialize() []byte {
 	var result bytes.Buffer
 	encoder := gob.NewEncoder(&result)
@@ -28,7 +27,6 @@ func (b *Block) Serialize() []byte {
 	return result.Bytes()
 }
 
-// 将字节数组反序列化为一个 Block
 func DeserializeBlock(d []byte) *Block {
 	var block Block
 
