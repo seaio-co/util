@@ -5,18 +5,26 @@ import (
 	"strconv"
 )
 
-func main() {
-	bc := NewBlockChain()
+func (cli *CLI) addBlock(data string) {
+	cli.bc.AddBlock(data)
+	fmt.Println("Success")
+}
 
-	bc.AddBlock("Send 1 BTC to Iand")
-	bc.AddBlock("Send 2 more BTC to Ivan")
+func (cli *CLI) printChain() {
+	bci := cli.bc.Iterator()
 
-	for _, block := range bc.blocks {
+	for {
+		block := bci.Next()
+
 		fmt.Printf("Prev hash: %x\n", block.PrevBlockHash)
 		fmt.Printf("Data: %s\n", block.Data)
 		fmt.Printf("Hash: %x\n", block.Hash)
 		pow := NewProofOfWork(block)
 		fmt.Printf("PoW: %s\n", strconv.FormatBool(pow.Validate()))
 		fmt.Println()
+
+		if len(block.PrevBlockHash) == 0 {
+			break
+		}
 	}
 }
