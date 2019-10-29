@@ -25,7 +25,7 @@ func NewBlockchain() *Blockchain {
 
 	err = db.Update(func(tx *bolt.Tx) error {
 		b := tx.Bucket([]byte(blocksBucket))
-		
+
 		if b == nil {
 			fmt.Println("No existing blockchain found. Creating a new one...")
 			genesis := NewGenesisBlock()
