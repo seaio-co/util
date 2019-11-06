@@ -43,3 +43,27 @@ func toSave(result string){
 		break
 	}
 }
+
+func httpGet(url string) (result string) {
+	resp, err := http.Get(url)
+	defer resp.Body.Close()
+	doError("connect error", err)
+	buf := make([]byte, 4096)
+	for {
+		n, err := resp.Body.Read(buf)
+		doError("read error", err)
+		//n=0
+		if n == 0 {
+			break
+		}
+		result += string(buf[:n])
+	}
+	return result
+}
+
+
+func doError(name string, err error) {
+	if (err != nil && err != io.EOF) {
+		fmt.Println(name, ":", err)
+	}
+}
