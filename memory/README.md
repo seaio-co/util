@@ -12,5 +12,5 @@
  &nbsp; | `GetPtr` | 返回内存中一定偏移量/固定大小的内容
  &nbsp; | `Len` | 返回内存内容的长度
  &nbsp; | `Data` | 返回内存内容
- &nbsp; | `Print` | 打印内存中的数据
+ &nbsp; | `Print` | 打印内存中数据
  
