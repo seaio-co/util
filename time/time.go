@@ -118,6 +118,13 @@ func GetStringToFormatUnix(timestr string) int64 {
 	return stamp.Unix()
 }
 
+// GetUnixToFormatDate Time stamp to date
+func GetUnixToFormatDate(unixTime int64) string {
+	timeTemplate := "2006-01-02 15:04:05"
+	stamp := time.Unix(unixTime, 0)
+	return stamp.Format(timeTemplate)
+}
+
 // Slight modification of the RFC3339Nano but it right pads all zeros and drops the time zone info
 const SortableTimeFormat = "2006-01-02T15:04:05.000000000"
 
