@@ -79,7 +79,7 @@ func Decrypt(src, key []byte) ([]byte, error) {
 	if err != nil {
 		panic("aes.NewCipher: " + err.Error())
 	}
-	// 长度不能小于aes.Blocksize
+	
 	if len(src) < aes.BlockSize {
 		return nil, errors.New("crypto/cipher: ciphertext too short")
 	}
