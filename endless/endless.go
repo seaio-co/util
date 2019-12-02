@@ -134,3 +134,25 @@ func NewServer(addr string, handler http.Handler) (srv *endlessServer) {
 
 	return
 }
+
+/*
+ListenAndServe listens on the TCP network address addr and then calls Serve
+with handler to handle requests on incoming connections. Handler is typically
+nil, in which case the DefaultServeMux is used.
+*/
+func ListenAndServe(addr string, handler http.Handler) error {
+	server := NewServer(addr, handler)
+	return server.ListenAndServe()
+}
+
+/*
+ListenAndServeTLS acts identically to ListenAndServe, except that it expects
+HTTPS connections. Additionally, files containing a certificate and matching
+private key for the server must be provided. If the certificate is signed by a
+certificate authority, the certFile should be the concatenation of the server's
+certificate followed by the CA's certificate.
+*/
+func ListenAndServeTLS(addr string, certFile string, keyFile string, handler http.Handler) error {
+	server := NewServer(addr, handler)
+	return server.ListenAndServeTLS(certFile, keyFile)
+}
