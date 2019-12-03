@@ -1,6 +1,7 @@
 package endless
 
 import (
+	"fmt"
 	"log"
 	"net"
 	"net/http"
@@ -155,4 +156,34 @@ certificate followed by the CA's certificate.
 func ListenAndServeTLS(addr string, certFile string, keyFile string, handler http.Handler) error {
 	server := NewServer(addr, handler)
 	return server.ListenAndServeTLS(certFile, keyFile)
+}
+
+/*
+getListener either opens a new socket to listen on, or takes the acceptor socket
+it got passed when restarted.
+*/
+func (srv *endlessServer) getListener(laddr string) (l net.Listener, err error) {
+	if srv.isChild {
+		var ptrOffset uint = 0
+		runningServerReg.RLock()
+		defer runningServerReg.RUnlock()
+		if len(socketPtrOffsetMap) > 0 {
+			ptrOffset = socketPtrOffsetMap[laddr]
+			// log.Println("laddr", laddr, "ptr offset", socketPtrOffsetMap[laddr])
+		}
+
+		f := os.NewFile(uintptr(3+ptrOffset), "")
+		l, err = net.FileListener(f)
+		if err != nil {
+			err = fmt.Errorf("net.FileListener error: %v", err)
+			return
+		}
+	} else {
+		l, err = net.Listen("tcp", laddr)
+		if err != nil {
+			err = fmt.Errorf("net.Listen error: %v", err)
+			return
+		}
+	}
+	return
 }
