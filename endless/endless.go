@@ -158,6 +158,13 @@ func ListenAndServeTLS(addr string, certFile string, keyFile string, handler htt
 	return server.ListenAndServeTLS(certFile, keyFile)
 }
 
+func (srv *endlessServer) getState() uint8 {
+	srv.lock.RLock()
+	defer srv.lock.RUnlock()
+
+	return srv.state
+}
+
 /*
 getListener either opens a new socket to listen on, or takes the acceptor socket
 it got passed when restarted.
