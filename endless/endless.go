@@ -165,6 +165,13 @@ func (srv *endlessServer) getState() uint8 {
 	return srv.state
 }
 
+func (srv *endlessServer) setState(st uint8) {
+	srv.lock.Lock()
+	defer srv.lock.Unlock()
+
+	srv.state = st
+}
+
 /*
 getListener either opens a new socket to listen on, or takes the acceptor socket
 it got passed when restarted.
