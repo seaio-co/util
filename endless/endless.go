@@ -173,6 +173,25 @@ func (srv *endlessServer) setState(st uint8) {
 }
 
 /*
+Serve accepts incoming HTTP connections on the listener l, creating a new
+service goroutine for each. The service goroutines read requests and then call
+handler to reply to them. Handler is typically nil, in which case the
+DefaultServeMux is used.
+In addition to the stl Serve behaviour each connection is added to a
+sync.Waitgroup so that all outstanding connections can be served before shutting
+down the server.
+*/
+func (srv *endlessServer) Serve() (err error) {
+	defer log.Println(syscall.Getpid(), "Serve() returning...")
+	srv.setState(STATE_RUNNING)
+	err = srv.Server.Serve(srv.EndlessListener)
+	log.Println(syscall.Getpid(), "Waiting for connections to finish...")
+	srv.wg.Wait()
+	srv.setState(STATE_TERMINATE)
+	return
+}
+
+/*
 getListener either opens a new socket to listen on, or takes the acceptor socket
 it got passed when restarted.
 */
