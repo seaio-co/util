@@ -192,6 +192,36 @@ func (srv *endlessServer) Serve() (err error) {
 }
 
 /*
+ListenAndServe listens on the TCP network address srv.Addr and then calls Serve
+to handle requests on incoming connections. If srv.Addr is blank, ":http" is
+used.
+*/
+func (srv *endlessServer) ListenAndServe() (err error) {
+	addr := srv.Addr
+	if addr == "" {
+		addr = ":http"
+	}
+
+	go srv.handleSignals()
+
+	l, err := srv.getListener(addr)
+	if err != nil {
+		log.Println(err)
+		return
+	}
+
+	srv.EndlessListener = newEndlessListener(l, srv)
+
+	if srv.isChild {
+		syscall.Kill(syscall.Getppid(), syscall.SIGTERM)
+	}
+
+	srv.BeforeBegin(srv.Addr)
+
+	return srv.Serve()
+}
+
+/*
 getListener either opens a new socket to listen on, or takes the acceptor socket
 it got passed when restarted.
 */
