@@ -1,6 +1,7 @@
 package endless
 
 import (
+	"crypto/tls"
 	"fmt"
 	"log"
 	"net"
@@ -218,6 +219,54 @@ func (srv *endlessServer) ListenAndServe() (err error) {
 
 	srv.BeforeBegin(srv.Addr)
 
+	return srv.Serve()
+}
+
+/*
+ListenAndServeTLS listens on the TCP network address srv.Addr and then calls
+Serve to handle requests on incoming TLS connections.
+Filenames containing a certificate and matching private key for the server must
+be provided. If the certificate is signed by a certificate authority, the
+certFile should be the concatenation of the server's certificate followed by the
+CA's certificate.
+If srv.Addr is blank, ":https" is used.
+*/
+func (srv *endlessServer) ListenAndServeTLS(certFile, keyFile string) (err error) {
+	addr := srv.Addr
+	if addr == "" {
+		addr = ":https"
+	}
+
+	config := &tls.Config{}
+	if srv.TLSConfig != nil {
+		*config = *srv.TLSConfig
+	}
+	if config.NextProtos == nil {
+		config.NextProtos = []string{"http/1.1"}
+	}
+
+	config.Certificates = make([]tls.Certificate, 1)
+	config.Certificates[0], err = tls.LoadX509KeyPair(certFile, keyFile)
+	if err != nil {
+		return
+	}
+
+	go srv.handleSignals()
+
+	l, err := srv.getListener(addr)
+	if err != nil {
+		log.Println(err)
+		return
+	}
+
+	srv.tlsInnerListener = newEndlessListener(l, srv)
+	srv.EndlessListener = tls.NewListener(srv.tlsInnerListener, config)
+
+	if srv.isChild {
+		syscall.Kill(syscall.Getppid(), syscall.SIGTERM)
+	}
+
+	log.Println(syscall.Getpid(), srv.Addr)
 	return srv.Serve()
 }
 
