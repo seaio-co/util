@@ -7,6 +7,7 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"os/signal"
 	"strings"
 	"sync"
 	"syscall"
@@ -298,4 +299,47 @@ func (srv *endlessServer) getListener(laddr string) (l net.Listener, err error) 
 		}
 	}
 	return
+}
+
+/*
+handleSignals listens for os Signals and calls any hooked in function that the
+user had registered with the signal.
+*/
+func (srv *endlessServer) handleSignals() {
+	var sig os.Signal
+
+	signal.Notify(
+		srv.sigChan,
+		hookableSignals...,
+	)
+
+	pid := syscall.Getpid()
+	for {
+		sig = <-srv.sigChan
+		srv.signalHooks(PRE_SIGNAL, sig)
+		switch sig {
+		case syscall.SIGHUP:
+			log.Println(pid, "Received SIGHUP. forking.")
+			err := srv.fork()
+			if err != nil {
+				log.Println("Fork err:", err)
+			}
+		case syscall.SIGUSR1:
+			log.Println(pid, "Received SIGUSR1.")
+		case syscall.SIGUSR2:
+			log.Println(pid, "Received SIGUSR2.")
+			srv.hammerTime(0 * time.Second)
+		case syscall.SIGINT:
+			log.Println(pid, "Received SIGINT.")
+			srv.shutdown()
+		case syscall.SIGTERM:
+			log.Println(pid, "Received SIGTERM.")
+			srv.shutdown()
+		case syscall.SIGTSTP:
+			log.Println(pid, "Received SIGTSTP.")
+		default:
+			log.Printf("Received %v: nothing i care about...\n", sig)
+		}
+		srv.signalHooks(POST_SIGNAL, sig)
+	}
 }
