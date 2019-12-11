@@ -1,5 +1,11 @@
 package cron
 
+import (
+	"fmt"
+	"strings"
+	"time"
+)
+
 // Configuration options for creating a parser. Most options specify which
 // fields should be included, while others enable features. If a field is not
 // included the parser will assume a default value. These options do not change
@@ -72,4 +78,74 @@ func NewParser(options ParseOption) Parser {
 		panic("multiple optionals may not be configured")
 	}
 	return Parser{options}
+}
+
+// Parse returns a new crontab schedule representing the given spec.
+// It returns a descriptive error if the spec is not valid.
+// It accepts crontab specs and features configured by NewParser.
+func (p Parser) Parse(spec string) (Schedule, error) {
+	if len(spec) == 0 {
+		return nil, fmt.Errorf("empty spec string")
+	}
+
+	// Extract timezone if present
+	var loc = time.Local
+	if strings.HasPrefix(spec, "TZ=") || strings.HasPrefix(spec, "CRON_TZ=") {
+		var err error
+		i := strings.Index(spec, " ")
+		eq := strings.Index(spec, "=")
+		if loc, err = time.LoadLocation(spec[eq+1 : i]); err != nil {
+			return nil, fmt.Errorf("provided bad location %s: %v", spec[eq+1:i], err)
+		}
+		spec = strings.TrimSpace(spec[i:])
+	}
+
+	// Handle named schedules (descriptors), if configured
+	if strings.HasPrefix(spec, "@") {
+		if p.options&Descriptor == 0 {
+			return nil, fmt.Errorf("parser does not accept descriptors: %v", spec)
+		}
+		return parseDescriptor(spec, loc)
+	}
+
+	// Split on whitespace.
+	fields := strings.Fields(spec)
+
+	// Validate & fill in any omitted or optional fields
+	var err error
+	fields, err = normalizeFields(fields, p.options)
+	if err != nil {
+		return nil, err
+	}
+
+	field := func(field string, r bounds) uint64 {
+		if err != nil {
+			return 0
+		}
+		var bits uint64
+		bits, err = getField(field, r)
+		return bits
+	}
+
+	var (
+		second     = field(fields[0], seconds)
+		minute     = field(fields[1], minutes)
+		hour       = field(fields[2], hours)
+		dayofmonth = field(fields[3], dom)
+		month      = field(fields[4], months)
+		dayofweek  = field(fields[5], dow)
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	return &SpecSchedule{
+		Second:   second,
+		Minute:   minute,
+		Hour:     hour,
+		Dom:      dayofmonth,
+		Month:    month,
+		Dow:      dayofweek,
+		Location: loc,
+	}, nil
 }
