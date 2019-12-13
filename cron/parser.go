@@ -149,3 +149,65 @@ func (p Parser) Parse(spec string) (Schedule, error) {
 		Location: loc,
 	}, nil
 }
+
+// normalizeFields takes a subset set of the time fields and returns the full set
+// with defaults (zeroes) populated for unset fields.
+//
+// As part of performing this function, it also validates that the provided
+// fields are compatible with the configured options.
+func normalizeFields(fields []string, options ParseOption) ([]string, error) {
+	// Validate optionals & add their field to options
+	optionals := 0
+	if options&SecondOptional > 0 {
+		options |= Second
+		optionals++
+	}
+	if options&DowOptional > 0 {
+		options |= Dow
+		optionals++
+	}
+	if optionals > 1 {
+		return nil, fmt.Errorf("multiple optionals may not be configured")
+	}
+
+	// Figure out how many fields we need
+	max := 0
+	for _, place := range places {
+		if options&place > 0 {
+			max++
+		}
+	}
+	min := max - optionals
+
+	// Validate number of fields
+	if count := len(fields); count < min || count > max {
+		if min == max {
+			return nil, fmt.Errorf("expected exactly %d fields, found %d: %s", min, count, fields)
+		}
+		return nil, fmt.Errorf("expected %d to %d fields, found %d: %s", min, max, count, fields)
+	}
+
+	// Populate the optional field if not provided
+	if min < max && len(fields) == min {
+		switch {
+		case options&DowOptional > 0:
+			fields = append(fields, defaults[5]) // TODO: improve access to default
+		case options&SecondOptional > 0:
+			fields = append([]string{defaults[0]}, fields...)
+		default:
+			return nil, fmt.Errorf("unknown optional field")
+		}
+	}
+
+	// Populate all fields not part of options with their defaults
+	n := 0
+	expandedFields := make([]string, len(places))
+	copy(expandedFields, defaults)
+	for i, place := range places {
+		if options&place > 0 {
+			expandedFields[i] = fields[n]
+			n++
+		}
+	}
+	return expandedFields, nil
+}
