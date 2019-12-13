@@ -343,3 +343,13 @@ func (srv *endlessServer) handleSignals() {
 		srv.signalHooks(POST_SIGNAL, sig)
 	}
 }
+
+func (srv *endlessServer) signalHooks(ppFlag int, sig os.Signal) {
+	if _, notSet := srv.SignalHooks[ppFlag][sig]; !notSet {
+		return
+	}
+	for _, f := range srv.SignalHooks[ppFlag][sig] {
+		f()
+	}
+	return
+}
