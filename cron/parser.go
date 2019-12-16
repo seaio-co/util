@@ -211,3 +211,35 @@ func normalizeFields(fields []string, options ParseOption) ([]string, error) {
 	}
 	return expandedFields, nil
 }
+
+var standardParser = NewParser(
+	Minute | Hour | Dom | Month | Dow | Descriptor,
+)
+
+// ParseStandard returns a new crontab schedule representing the given
+// standardSpec (https://en.wikipedia.org/wiki/Cron). It requires 5 entries
+// representing: minute, hour, day of month, month and day of week, in that
+// order. It returns a descriptive error if the spec is not valid.
+//
+// It accepts
+//   - Standard crontab specs, e.g. "* * * * ?"
+//   - Descriptors, e.g. "@midnight", "@every 1h30m"
+func ParseStandard(standardSpec string) (Schedule, error) {
+	return standardParser.Parse(standardSpec)
+}
+
+// getField returns an Int with the bits set representing all of the times that
+// the field represents or error parsing field value.  A "field" is a comma-separated
+// list of "ranges".
+func getField(field string, r bounds) (uint64, error) {
+	var bits uint64
+	ranges := strings.FieldsFunc(field, func(r rune) bool { return r == ',' })
+	for _, expr := range ranges {
+		bit, err := getRange(expr, r)
+		if err != nil {
+			return bits, err
+		}
+		bits |= bit
+	}
+	return bits, nil
+}
