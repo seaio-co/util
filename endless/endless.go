@@ -353,3 +353,27 @@ func (srv *endlessServer) signalHooks(ppFlag int, sig os.Signal) {
 	}
 	return
 }
+
+/*
+shutdown closes the listener so that no new connections are accepted. it also
+starts a goroutine that will hammer (stop all running requests) the server
+after DefaultHammerTime.
+*/
+func (srv *endlessServer) shutdown() {
+	if srv.getState() != STATE_RUNNING {
+		return
+	}
+
+	srv.setState(STATE_SHUTTING_DOWN)
+	if DefaultHammerTime >= 0 {
+		go srv.hammerTime(DefaultHammerTime)
+	}
+	// disable keep-alives on existing connections
+	srv.SetKeepAlivesEnabled(false)
+	err := srv.EndlessListener.Close()
+	if err != nil {
+		log.Println(syscall.Getpid(), "Listener.Close() error:", err)
+	} else {
+		log.Println(syscall.Getpid(), srv.EndlessListener.Addr(), "Listener closed.")
+	}
+}
