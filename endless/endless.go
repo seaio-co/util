@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"runtime"
 	"strings"
 	"sync"
 	"syscall"
@@ -375,5 +376,36 @@ func (srv *endlessServer) shutdown() {
 		log.Println(syscall.Getpid(), "Listener.Close() error:", err)
 	} else {
 		log.Println(syscall.Getpid(), srv.EndlessListener.Addr(), "Listener closed.")
+	}
+}
+
+/*
+hammerTime forces the server to shutdown in a given timeout - whether it
+finished outstanding requests or not. if Read/WriteTimeout are not set or the
+max header size is very big a connection could hang...
+srv.Serve() will not return until all connections are served. this will
+unblock the srv.wg.Wait() in Serve() thus causing ListenAndServe(TLS) to
+return.
+*/
+func (srv *endlessServer) hammerTime(d time.Duration) {
+	defer func() {
+		// we are calling srv.wg.Done() until it panics which means we called
+		// Done() when the counter was already at 0 and we're done.
+		// (and thus Serve() will return and the parent will exit)
+		if r := recover(); r != nil {
+			log.Println("WaitGroup at 0", r)
+		}
+	}()
+	if srv.getState() != STATE_SHUTTING_DOWN {
+		return
+	}
+	time.Sleep(d)
+	log.Println("[STOP - Hammer Time] Forcefully shutting down parent")
+	for {
+		if srv.getState() == STATE_TERMINATE {
+			break
+		}
+		srv.wg.Done()
+		runtime.Gosched()
 	}
 }
