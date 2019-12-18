@@ -2,11 +2,13 @@ package endless
 
 import (
 	"crypto/tls"
+	"errors"
 	"fmt"
 	"log"
 	"net"
 	"net/http"
 	"os"
+	"os/exec"
 	"os/signal"
 	"runtime"
 	"strings"
@@ -408,4 +410,66 @@ func (srv *endlessServer) hammerTime(d time.Duration) {
 		srv.wg.Done()
 		runtime.Gosched()
 	}
+}
+
+func (srv *endlessServer) fork() (err error) {
+	runningServerReg.Lock()
+	defer runningServerReg.Unlock()
+
+	// only one server instance should fork!
+	if runningServersForked {
+		return errors.New("Another process already forked. Ignoring this one.")
+	}
+
+	runningServersForked = true
+
+	var files = make([]*os.File, len(runningServers))
+	var orderArgs = make([]string, len(runningServers))
+	// get the accessor socket fds for _all_ server instances
+	for _, srvPtr := range runningServers {
+		// introspect.PrintTypeDump(srvPtr.EndlessListener)
+		switch srvPtr.EndlessListener.(type) {
+		case *endlessListener:
+			// normal listener
+			files[socketPtrOffsetMap[srvPtr.Server.Addr]] = srvPtr.EndlessListener.(*endlessListener).File()
+		default:
+			// tls listener
+			files[socketPtrOffsetMap[srvPtr.Server.Addr]] = srvPtr.tlsInnerListener.File()
+		}
+		orderArgs[socketPtrOffsetMap[srvPtr.Server.Addr]] = srvPtr.Server.Addr
+	}
+
+	env := append(
+		os.Environ(),
+		"ENDLESS_CONTINUE=1",
+	)
+	if len(runningServers) > 1 {
+		env = append(env, fmt.Sprintf(`ENDLESS_SOCKET_ORDER=%s`, strings.Join(orderArgs, ",")))
+	}
+
+	// log.Println(files)
+	path := os.Args[0]
+	var args []string
+	if len(os.Args) > 1 {
+		args = os.Args[1:]
+	}
+
+	cmd := exec.Command(path, args...)
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	cmd.ExtraFiles = files
+	cmd.Env = env
+
+	// cmd.SysProcAttr = &syscall.SysProcAttr{
+	// 	Setsid:  true,
+	// 	Setctty: true,
+	// 	Ctty:    ,
+	// }
+
+	err = cmd.Start()
+	if err != nil {
+		log.Fatalf("Restart: Failed to launch, error: %v", err)
+	}
+
+	return
 }
