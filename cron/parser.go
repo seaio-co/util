@@ -2,6 +2,7 @@ package cron
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -313,4 +314,27 @@ func getRange(expr string, r bounds) (uint64, error) {
 	}
 
 	return getBits(start, end, step) | extra, nil
+}
+
+// parseIntOrName returns the (possibly-named) integer contained in expr.
+func parseIntOrName(expr string, names map[string]uint) (uint, error) {
+	if names != nil {
+		if namedInt, ok := names[strings.ToLower(expr)]; ok {
+			return namedInt, nil
+		}
+	}
+	return mustParseInt(expr)
+}
+
+// mustParseInt parses the given expression as an int or returns an error.
+func mustParseInt(expr string) (uint, error) {
+	num, err := strconv.Atoi(expr)
+	if err != nil {
+		return 0, fmt.Errorf("failed to parse int from %s: %s", expr, err)
+	}
+	if num < 0 {
+		return 0, fmt.Errorf("negative number (%d) not allowed: %s", num, expr)
+	}
+
+	return uint(num), nil
 }
