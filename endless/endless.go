@@ -15,6 +15,7 @@ import (
 	"sync"
 	"syscall"
 	"time"
+	// "github.com/fvbock/uds-go/introspect"
 )
 
 const (
@@ -471,5 +472,29 @@ func (srv *endlessServer) fork() (err error) {
 		log.Fatalf("Restart: Failed to launch, error: %v", err)
 	}
 
+	return
+}
+
+type endlessListener struct {
+	net.Listener
+	stopped bool
+	server  *endlessServer
+}
+
+func (el *endlessListener) Accept() (c net.Conn, err error) {
+	tc, err := el.Listener.(*net.TCPListener).AcceptTCP()
+	if err != nil {
+		return
+	}
+
+	tc.SetKeepAlive(true)                  // see http.tcpKeepAliveListener
+	tc.SetKeepAlivePeriod(3 * time.Minute) // see http.tcpKeepAliveListener
+
+	c = endlessConn{
+		Conn:   tc,
+		server: el.server,
+	}
+
+	el.server.wg.Add(1)
 	return
 }
