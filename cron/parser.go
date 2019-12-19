@@ -2,6 +2,7 @@ package cron
 
 import (
 	"fmt"
+	"math"
 	"strconv"
 	"strings"
 	"time"
@@ -337,4 +338,25 @@ func mustParseInt(expr string) (uint, error) {
 	}
 
 	return uint(num), nil
+}
+
+// getBits sets all bits in the range [min, max], modulo the given step size.
+func getBits(min, max, step uint) uint64 {
+	var bits uint64
+
+	// If step is 1, use shifts.
+	if step == 1 {
+		return ^(math.MaxUint64 << (max + 1)) & (math.MaxUint64 << min)
+	}
+
+	// Else, use a simple loop.
+	for i := min; i <= max; i += step {
+		bits |= 1 << i
+	}
+	return bits
+}
+
+// all returns all bits within the given bounds.  (plus the star bit)
+func all(r bounds) uint64 {
+	return getBits(r.min, r.max, 1) | starBit
 }
