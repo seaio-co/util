@@ -498,3 +498,28 @@ func (el *endlessListener) Accept() (c net.Conn, err error) {
 	el.server.wg.Add(1)
 	return
 }
+
+func newEndlessListener(l net.Listener, srv *endlessServer) (el *endlessListener) {
+	el = &endlessListener{
+		Listener: l,
+		server:   srv,
+	}
+
+	return
+}
+
+func (el *endlessListener) Close() error {
+	if el.stopped {
+		return syscall.EINVAL
+	}
+
+	el.stopped = true
+	return el.Listener.Close()
+}
+
+func (el *endlessListener) File() *os.File {
+	// returns a dup(2) - FD_CLOEXEC flag *not* set
+	tl := el.Listener.(*net.TCPListener)
+	fl, _ := tl.File()
+	return fl
+}
