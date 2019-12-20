@@ -360,3 +360,75 @@ func getBits(min, max, step uint) uint64 {
 func all(r bounds) uint64 {
 	return getBits(r.min, r.max, 1) | starBit
 }
+
+// parseDescriptor returns a predefined schedule for the expression, or error if none matches.
+func parseDescriptor(descriptor string, loc *time.Location) (Schedule, error) {
+	switch descriptor {
+	case "@yearly", "@annually":
+		return &SpecSchedule{
+			Second:   1 << seconds.min,
+			Minute:   1 << minutes.min,
+			Hour:     1 << hours.min,
+			Dom:      1 << dom.min,
+			Month:    1 << months.min,
+			Dow:      all(dow),
+			Location: loc,
+		}, nil
+
+	case "@monthly":
+		return &SpecSchedule{
+			Second:   1 << seconds.min,
+			Minute:   1 << minutes.min,
+			Hour:     1 << hours.min,
+			Dom:      1 << dom.min,
+			Month:    all(months),
+			Dow:      all(dow),
+			Location: loc,
+		}, nil
+
+	case "@weekly":
+		return &SpecSchedule{
+			Second:   1 << seconds.min,
+			Minute:   1 << minutes.min,
+			Hour:     1 << hours.min,
+			Dom:      all(dom),
+			Month:    all(months),
+			Dow:      1 << dow.min,
+			Location: loc,
+		}, nil
+
+	case "@daily", "@midnight":
+		return &SpecSchedule{
+			Second:   1 << seconds.min,
+			Minute:   1 << minutes.min,
+			Hour:     1 << hours.min,
+			Dom:      all(dom),
+			Month:    all(months),
+			Dow:      all(dow),
+			Location: loc,
+		}, nil
+
+	case "@hourly":
+		return &SpecSchedule{
+			Second:   1 << seconds.min,
+			Minute:   1 << minutes.min,
+			Hour:     all(hours),
+			Dom:      all(dom),
+			Month:    all(months),
+			Dow:      all(dow),
+			Location: loc,
+		}, nil
+
+	}
+
+	const every = "@every "
+	if strings.HasPrefix(descriptor, every) {
+		duration, err := time.ParseDuration(descriptor[len(every):])
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse duration %s: %s", descriptor, err)
+		}
+		return Every(duration), nil
+	}
+
+	return nil, fmt.Errorf("unrecognized descriptor: %s", descriptor)
+}
