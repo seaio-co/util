@@ -523,3 +523,36 @@ func (el *endlessListener) File() *os.File {
 	fl, _ := tl.File()
 	return fl
 }
+
+type endlessConn struct {
+	net.Conn
+	server *endlessServer
+}
+
+func (w endlessConn) Close() error {
+	err := w.Conn.Close()
+	if err == nil {
+		w.server.wg.Done()
+	}
+	return err
+}
+
+/*
+RegisterSignalHook registers a function to be run PRE_SIGNAL or POST_SIGNAL for
+a given signal. PRE or POST in this case means before or after the signal
+related code endless itself runs
+*/
+func (srv *endlessServer) RegisterSignalHook(prePost int, sig os.Signal, f func()) (err error) {
+	if prePost != PRE_SIGNAL && prePost != POST_SIGNAL {
+		err = fmt.Errorf("Cannot use %v for prePost arg. Must be endless.PRE_SIGNAL or endless.POST_SIGNAL.", sig)
+		return
+	}
+	for _, s := range hookableSignals {
+		if s == sig {
+			srv.SignalHooks[prePost][sig] = append(srv.SignalHooks[prePost][sig], f)
+			return
+		}
+	}
+	err = fmt.Errorf("Signal %v is not supported.", sig)
+	return
+}
