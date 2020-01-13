@@ -1,0 +1,7 @@
+package netpoll
+
+import "fmt"
+
+func setNonblock(fd int, nonblocking bool) (err error) {
+	return fmt.Errorf("setNonblock is not supported on this operating system")
+}
