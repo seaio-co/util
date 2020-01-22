@@ -12,7 +12,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/mylxsw/asteria/log"
+	"log"
 )
 
 // OutputType command output type
