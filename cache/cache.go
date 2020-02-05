@@ -248,3 +248,113 @@ func (c *cache) IncrementFloat(k string, n float64) error {
 	c.mu.Unlock()
 	return nil
 }
+
+// Increment an item of type int by n. Returns an error if the item's value is
+// not an int, or if it was not found. If there is no error, the incremented
+// value is returned.
+func (c *cache) IncrementInt(k string, n int) (int, error) {
+	c.mu.Lock()
+	v, found := c.items[k]
+	if !found || v.Expired() {
+		c.mu.Unlock()
+		return 0, fmt.Errorf("Item %s not found", k)
+	}
+	rv, ok := v.Object.(int)
+	if !ok {
+		c.mu.Unlock()
+		return 0, fmt.Errorf("The value for %s is not an int", k)
+	}
+	nv := rv + n
+	v.Object = nv
+	c.items[k] = v
+	c.mu.Unlock()
+	return nv, nil
+}
+
+// Increment an item of type int8 by n. Returns an error if the item's value is
+// not an int8, or if it was not found. If there is no error, the incremented
+// value is returned.
+func (c *cache) IncrementInt8(k string, n int8) (int8, error) {
+	c.mu.Lock()
+	v, found := c.items[k]
+	if !found || v.Expired() {
+		c.mu.Unlock()
+		return 0, fmt.Errorf("Item %s not found", k)
+	}
+	rv, ok := v.Object.(int8)
+	if !ok {
+		c.mu.Unlock()
+		return 0, fmt.Errorf("The value for %s is not an int8", k)
+	}
+	nv := rv + n
+	v.Object = nv
+	c.items[k] = v
+	c.mu.Unlock()
+	return nv, nil
+}
+
+// Increment an item of type int16 by n. Returns an error if the item's value is
+// not an int16, or if it was not found. If there is no error, the incremented
+// value is returned.
+func (c *cache) IncrementInt16(k string, n int16) (int16, error) {
+	c.mu.Lock()
+	v, found := c.items[k]
+	if !found || v.Expired() {
+		c.mu.Unlock()
+		return 0, fmt.Errorf("Item %s not found", k)
+	}
+	rv, ok := v.Object.(int16)
+	if !ok {
+		c.mu.Unlock()
+		return 0, fmt.Errorf("The value for %s is not an int16", k)
+	}
+	nv := rv + n
+	v.Object = nv
+	c.items[k] = v
+	c.mu.Unlock()
+	return nv, nil
+}
+
+// Increment an item of type int32 by n. Returns an error if the item's value is
+// not an int32, or if it was not found. If there is no error, the incremented
+// value is returned.
+func (c *cache) IncrementInt32(k string, n int32) (int32, error) {
+	c.mu.Lock()
+	v, found := c.items[k]
+	if !found || v.Expired() {
+		c.mu.Unlock()
+		return 0, fmt.Errorf("Item %s not found", k)
+	}
+	rv, ok := v.Object.(int32)
+	if !ok {
+		c.mu.Unlock()
+		return 0, fmt.Errorf("The value for %s is not an int32", k)
+	}
+	nv := rv + n
+	v.Object = nv
+	c.items[k] = v
+	c.mu.Unlock()
+	return nv, nil
+}
+
+// Increment an item of type int64 by n. Returns an error if the item's value is
+// not an int64, or if it was not found. If there is no error, the incremented
+// value is returned.
+func (c *cache) IncrementInt64(k string, n int64) (int64, error) {
+	c.mu.Lock()
+	v, found := c.items[k]
+	if !found || v.Expired() {
+		c.mu.Unlock()
+		return 0, fmt.Errorf("Item %s not found", k)
+	}
+	rv, ok := v.Object.(int64)
+	if !ok {
+		c.mu.Unlock()
+		return 0, fmt.Errorf("The value for %s is not an int64", k)
+	}
+	nv := rv + n
+	v.Object = nv
+	c.items[k] = v
+	c.mu.Unlock()
+	return nv, nil
+}
