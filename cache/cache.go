@@ -358,3 +358,135 @@ func (c *cache) IncrementInt64(k string, n int64) (int64, error) {
 	c.mu.Unlock()
 	return nv, nil
 }
+
+// Increment an item of type uint by n. Returns an error if the item's value is
+// not an uint, or if it was not found. If there is no error, the incremented
+// value is returned.
+func (c *cache) IncrementUint(k string, n uint) (uint, error) {
+	c.mu.Lock()
+	v, found := c.items[k]
+	if !found || v.Expired() {
+		c.mu.Unlock()
+		return 0, fmt.Errorf("Item %s not found", k)
+	}
+	rv, ok := v.Object.(uint)
+	if !ok {
+		c.mu.Unlock()
+		return 0, fmt.Errorf("The value for %s is not an uint", k)
+	}
+	nv := rv + n
+	v.Object = nv
+	c.items[k] = v
+	c.mu.Unlock()
+	return nv, nil
+}
+
+// Increment an item of type uintptr by n. Returns an error if the item's value
+// is not an uintptr, or if it was not found. If there is no error, the
+// incremented value is returned.
+func (c *cache) IncrementUintptr(k string, n uintptr) (uintptr, error) {
+	c.mu.Lock()
+	v, found := c.items[k]
+	if !found || v.Expired() {
+		c.mu.Unlock()
+		return 0, fmt.Errorf("Item %s not found", k)
+	}
+	rv, ok := v.Object.(uintptr)
+	if !ok {
+		c.mu.Unlock()
+		return 0, fmt.Errorf("The value for %s is not an uintptr", k)
+	}
+	nv := rv + n
+	v.Object = nv
+	c.items[k] = v
+	c.mu.Unlock()
+	return nv, nil
+}
+
+// Increment an item of type uint8 by n. Returns an error if the item's value
+// is not an uint8, or if it was not found. If there is no error, the
+// incremented value is returned.
+func (c *cache) IncrementUint8(k string, n uint8) (uint8, error) {
+	c.mu.Lock()
+	v, found := c.items[k]
+	if !found || v.Expired() {
+		c.mu.Unlock()
+		return 0, fmt.Errorf("Item %s not found", k)
+	}
+	rv, ok := v.Object.(uint8)
+	if !ok {
+		c.mu.Unlock()
+		return 0, fmt.Errorf("The value for %s is not an uint8", k)
+	}
+	nv := rv + n
+	v.Object = nv
+	c.items[k] = v
+	c.mu.Unlock()
+	return nv, nil
+}
+
+// Increment an item of type uint16 by n. Returns an error if the item's value
+// is not an uint16, or if it was not found. If there is no error, the
+// incremented value is returned.
+func (c *cache) IncrementUint16(k string, n uint16) (uint16, error) {
+	c.mu.Lock()
+	v, found := c.items[k]
+	if !found || v.Expired() {
+		c.mu.Unlock()
+		return 0, fmt.Errorf("Item %s not found", k)
+	}
+	rv, ok := v.Object.(uint16)
+	if !ok {
+		c.mu.Unlock()
+		return 0, fmt.Errorf("The value for %s is not an uint16", k)
+	}
+	nv := rv + n
+	v.Object = nv
+	c.items[k] = v
+	c.mu.Unlock()
+	return nv, nil
+}
+
+// Increment an item of type uint32 by n. Returns an error if the item's value
+// is not an uint32, or if it was not found. If there is no error, the
+// incremented value is returned.
+func (c *cache) IncrementUint32(k string, n uint32) (uint32, error) {
+	c.mu.Lock()
+	v, found := c.items[k]
+	if !found || v.Expired() {
+		c.mu.Unlock()
+		return 0, fmt.Errorf("Item %s not found", k)
+	}
+	rv, ok := v.Object.(uint32)
+	if !ok {
+		c.mu.Unlock()
+		return 0, fmt.Errorf("The value for %s is not an uint32", k)
+	}
+	nv := rv + n
+	v.Object = nv
+	c.items[k] = v
+	c.mu.Unlock()
+	return nv, nil
+}
+
+// Increment an item of type uint64 by n. Returns an error if the item's value
+// is not an uint64, or if it was not found. If there is no error, the
+// incremented value is returned.
+func (c *cache) IncrementUint64(k string, n uint64) (uint64, error) {
+	c.mu.Lock()
+	v, found := c.items[k]
+	if !found || v.Expired() {
+		c.mu.Unlock()
+		return 0, fmt.Errorf("Item %s not found", k)
+	}
+	rv, ok := v.Object.(uint64)
+	if !ok {
+		c.mu.Unlock()
+		return 0, fmt.Errorf("The value for %s is not an uint64", k)
+	}
+	nv := rv + n
+	v.Object = nv
+	c.items[k] = v
+	c.mu.Unlock()
+	return nv, nil
+}
