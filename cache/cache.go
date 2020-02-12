@@ -852,3 +852,47 @@ func (c *cache) DecrementUint64(k string, n uint64) (uint64, error) {
 	c.mu.Unlock()
 	return nv, nil
 }
+
+// Decrement an item of type float32 by n. Returns an error if the item's value
+// is not an float32, or if it was not found. If there is no error, the
+// decremented value is returned.
+func (c *cache) DecrementFloat32(k string, n float32) (float32, error) {
+	c.mu.Lock()
+	v, found := c.items[k]
+	if !found || v.Expired() {
+		c.mu.Unlock()
+		return 0, fmt.Errorf("Item %s not found", k)
+	}
+	rv, ok := v.Object.(float32)
+	if !ok {
+		c.mu.Unlock()
+		return 0, fmt.Errorf("The value for %s is not an float32", k)
+	}
+	nv := rv - n
+	v.Object = nv
+	c.items[k] = v
+	c.mu.Unlock()
+	return nv, nil
+}
+
+// Decrement an item of type float64 by n. Returns an error if the item's value
+// is not an float64, or if it was not found. If there is no error, the
+// decremented value is returned.
+func (c *cache) DecrementFloat64(k string, n float64) (float64, error) {
+	c.mu.Lock()
+	v, found := c.items[k]
+	if !found || v.Expired() {
+		c.mu.Unlock()
+		return 0, fmt.Errorf("Item %s not found", k)
+	}
+	rv, ok := v.Object.(float64)
+	if !ok {
+		c.mu.Unlock()
+		return 0, fmt.Errorf("The value for %s is not an float64", k)
+	}
+	nv := rv - n
+	v.Object = nv
+	c.items[k] = v
+	c.mu.Unlock()
+	return nv, nil
+}
