@@ -407,3 +407,163 @@ func TestDecrementWithInt(t *testing.T) {
 		t.Error("int is not 3:", x)
 	}
 }
+
+func TestDecrementWithInt8(t *testing.T) {
+	tc := New(DefaultExpiration, 0)
+	tc.Set("int8", int8(5), DefaultExpiration)
+	err := tc.Decrement("int8", 2)
+	if err != nil {
+		t.Error("Error decrementing:", err)
+	}
+	x, found := tc.Get("int8")
+	if !found {
+		t.Error("int8 was not found")
+	}
+	if x.(int8) != 3 {
+		t.Error("int8 is not 3:", x)
+	}
+}
+
+func TestDecrementWithInt16(t *testing.T) {
+	tc := New(DefaultExpiration, 0)
+	tc.Set("int16", int16(5), DefaultExpiration)
+	err := tc.Decrement("int16", 2)
+	if err != nil {
+		t.Error("Error decrementing:", err)
+	}
+	x, found := tc.Get("int16")
+	if !found {
+		t.Error("int16 was not found")
+	}
+	if x.(int16) != 3 {
+		t.Error("int16 is not 3:", x)
+	}
+}
+
+func TestDecrementWithInt32(t *testing.T) {
+	tc := New(DefaultExpiration, 0)
+	tc.Set("int32", int32(5), DefaultExpiration)
+	err := tc.Decrement("int32", 2)
+	if err != nil {
+		t.Error("Error decrementing:", err)
+	}
+	x, found := tc.Get("int32")
+	if !found {
+		t.Error("int32 was not found")
+	}
+	if x.(int32) != 3 {
+		t.Error("int32 is not 3:", x)
+	}
+}
+
+func TestDecrementWithInt64(t *testing.T) {
+	tc := New(DefaultExpiration, 0)
+	tc.Set("int64", int64(5), DefaultExpiration)
+	err := tc.Decrement("int64", 2)
+	if err != nil {
+		t.Error("Error decrementing:", err)
+	}
+	x, found := tc.Get("int64")
+	if !found {
+		t.Error("int64 was not found")
+	}
+	if x.(int64) != 3 {
+		t.Error("int64 is not 3:", x)
+	}
+}
+
+func TestDecrementWithUint(t *testing.T) {
+	tc := New(DefaultExpiration, 0)
+	tc.Set("uint", uint(5), DefaultExpiration)
+	err := tc.Decrement("uint", 2)
+	if err != nil {
+		t.Error("Error decrementing:", err)
+	}
+	x, found := tc.Get("uint")
+	if !found {
+		t.Error("uint was not found")
+	}
+	if x.(uint) != 3 {
+		t.Error("uint is not 3:", x)
+	}
+}
+
+func TestDecrementWithUintptr(t *testing.T) {
+	tc := New(DefaultExpiration, 0)
+	tc.Set("uintptr", uintptr(5), DefaultExpiration)
+	err := tc.Decrement("uintptr", 2)
+	if err != nil {
+		t.Error("Error decrementing:", err)
+	}
+	x, found := tc.Get("uintptr")
+	if !found {
+		t.Error("uintptr was not found")
+	}
+	if x.(uintptr) != 3 {
+		t.Error("uintptr is not 3:", x)
+	}
+}
+
+func TestDecrementWithUint8(t *testing.T) {
+	tc := New(DefaultExpiration, 0)
+	tc.Set("uint8", uint8(5), DefaultExpiration)
+	err := tc.Decrement("uint8", 2)
+	if err != nil {
+		t.Error("Error decrementing:", err)
+	}
+	x, found := tc.Get("uint8")
+	if !found {
+		t.Error("uint8 was not found")
+	}
+	if x.(uint8) != 3 {
+		t.Error("uint8 is not 3:", x)
+	}
+}
+
+func TestDecrementWithUint16(t *testing.T) {
+	tc := New(DefaultExpiration, 0)
+	tc.Set("uint16", uint16(5), DefaultExpiration)
+	err := tc.Decrement("uint16", 2)
+	if err != nil {
+		t.Error("Error decrementing:", err)
+	}
+	x, found := tc.Get("uint16")
+	if !found {
+		t.Error("uint16 was not found")
+	}
+	if x.(uint16) != 3 {
+		t.Error("uint16 is not 3:", x)
+	}
+}
+
+func TestDecrementWithUint32(t *testing.T) {
+	tc := New(DefaultExpiration, 0)
+	tc.Set("uint32", uint32(5), DefaultExpiration)
+	err := tc.Decrement("uint32", 2)
+	if err != nil {
+		t.Error("Error decrementing:", err)
+	}
+	x, found := tc.Get("uint32")
+	if !found {
+		t.Error("uint32 was not found")
+	}
+	if x.(uint32) != 3 {
+		t.Error("uint32 is not 3:", x)
+	}
+}
+
+func TestDecrementWithUint64(t *testing.T) {
+	tc := New(DefaultExpiration, 0)
+	tc.Set("uint64", uint64(5), DefaultExpiration)
+	err := tc.Decrement("uint64", 2)
+	if err != nil {
+		t.Error("Error decrementing:", err)
+	}
+	x, found := tc.Get("uint64")
+	if !found {
+		t.Error("uint64 was not found")
+	}
+	if x.(uint64) != 3 {
+		t.Error("uint64 is not 3:", x)
+	}
+}
