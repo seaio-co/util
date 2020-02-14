@@ -726,3 +726,231 @@ func TestIncrementInt64(t *testing.T) {
 		t.Error("tint64 is not 3:", x)
 	}
 }
+
+func TestIncrementUint(t *testing.T) {
+	tc := New(DefaultExpiration, 0)
+	tc.Set("tuint", uint(1), DefaultExpiration)
+	n, err := tc.IncrementUint("tuint", 2)
+	if err != nil {
+		t.Error("Error incrementing:", err)
+	}
+	if n != 3 {
+		t.Error("Returned number is not 3:", n)
+	}
+	x, found := tc.Get("tuint")
+	if !found {
+		t.Error("tuint was not found")
+	}
+	if x.(uint) != 3 {
+		t.Error("tuint is not 3:", x)
+	}
+}
+
+func TestIncrementUintptr(t *testing.T) {
+	tc := New(DefaultExpiration, 0)
+	tc.Set("tuintptr", uintptr(1), DefaultExpiration)
+	n, err := tc.IncrementUintptr("tuintptr", 2)
+	if err != nil {
+		t.Error("Error incrementing:", err)
+	}
+	if n != 3 {
+		t.Error("Returned number is not 3:", n)
+	}
+	x, found := tc.Get("tuintptr")
+	if !found {
+		t.Error("tuintptr was not found")
+	}
+	if x.(uintptr) != 3 {
+		t.Error("tuintptr is not 3:", x)
+	}
+}
+
+func TestIncrementUint8(t *testing.T) {
+	tc := New(DefaultExpiration, 0)
+	tc.Set("tuint8", uint8(1), DefaultExpiration)
+	n, err := tc.IncrementUint8("tuint8", 2)
+	if err != nil {
+		t.Error("Error incrementing:", err)
+	}
+	if n != 3 {
+		t.Error("Returned number is not 3:", n)
+	}
+	x, found := tc.Get("tuint8")
+	if !found {
+		t.Error("tuint8 was not found")
+	}
+	if x.(uint8) != 3 {
+		t.Error("tuint8 is not 3:", x)
+	}
+}
+
+func TestIncrementUint16(t *testing.T) {
+	tc := New(DefaultExpiration, 0)
+	tc.Set("tuint16", uint16(1), DefaultExpiration)
+	n, err := tc.IncrementUint16("tuint16", 2)
+	if err != nil {
+		t.Error("Error incrementing:", err)
+	}
+	if n != 3 {
+		t.Error("Returned number is not 3:", n)
+	}
+	x, found := tc.Get("tuint16")
+	if !found {
+		t.Error("tuint16 was not found")
+	}
+	if x.(uint16) != 3 {
+		t.Error("tuint16 is not 3:", x)
+	}
+}
+
+func TestIncrementUint32(t *testing.T) {
+	tc := New(DefaultExpiration, 0)
+	tc.Set("tuint32", uint32(1), DefaultExpiration)
+	n, err := tc.IncrementUint32("tuint32", 2)
+	if err != nil {
+		t.Error("Error incrementing:", err)
+	}
+	if n != 3 {
+		t.Error("Returned number is not 3:", n)
+	}
+	x, found := tc.Get("tuint32")
+	if !found {
+		t.Error("tuint32 was not found")
+	}
+	if x.(uint32) != 3 {
+		t.Error("tuint32 is not 3:", x)
+	}
+}
+
+func TestIncrementUint64(t *testing.T) {
+	tc := New(DefaultExpiration, 0)
+	tc.Set("tuint64", uint64(1), DefaultExpiration)
+	n, err := tc.IncrementUint64("tuint64", 2)
+	if err != nil {
+		t.Error("Error incrementing:", err)
+	}
+	if n != 3 {
+		t.Error("Returned number is not 3:", n)
+	}
+	x, found := tc.Get("tuint64")
+	if !found {
+		t.Error("tuint64 was not found")
+	}
+	if x.(uint64) != 3 {
+		t.Error("tuint64 is not 3:", x)
+	}
+}
+
+func TestIncrementFloat32(t *testing.T) {
+	tc := New(DefaultExpiration, 0)
+	tc.Set("float32", float32(1.5), DefaultExpiration)
+	n, err := tc.IncrementFloat32("float32", 2)
+	if err != nil {
+		t.Error("Error incrementing:", err)
+	}
+	if n != 3.5 {
+		t.Error("Returned number is not 3.5:", n)
+	}
+	x, found := tc.Get("float32")
+	if !found {
+		t.Error("float32 was not found")
+	}
+	if x.(float32) != 3.5 {
+		t.Error("float32 is not 3.5:", x)
+	}
+}
+
+func TestIncrementFloat64(t *testing.T) {
+	tc := New(DefaultExpiration, 0)
+	tc.Set("float64", float64(1.5), DefaultExpiration)
+	n, err := tc.IncrementFloat64("float64", 2)
+	if err != nil {
+		t.Error("Error incrementing:", err)
+	}
+	if n != 3.5 {
+		t.Error("Returned number is not 3.5:", n)
+	}
+	x, found := tc.Get("float64")
+	if !found {
+		t.Error("float64 was not found")
+	}
+	if x.(float64) != 3.5 {
+		t.Error("float64 is not 3.5:", x)
+	}
+}
+
+func TestDecrementInt8(t *testing.T) {
+	tc := New(DefaultExpiration, 0)
+	tc.Set("int8", int8(5), DefaultExpiration)
+	n, err := tc.DecrementInt8("int8", 2)
+	if err != nil {
+		t.Error("Error decrementing:", err)
+	}
+	if n != 3 {
+		t.Error("Returned number is not 3:", n)
+	}
+	x, found := tc.Get("int8")
+	if !found {
+		t.Error("int8 was not found")
+	}
+	if x.(int8) != 3 {
+		t.Error("int8 is not 3:", x)
+	}
+}
+
+func TestDecrementInt16(t *testing.T) {
+	tc := New(DefaultExpiration, 0)
+	tc.Set("int16", int16(5), DefaultExpiration)
+	n, err := tc.DecrementInt16("int16", 2)
+	if err != nil {
+		t.Error("Error decrementing:", err)
+	}
+	if n != 3 {
+		t.Error("Returned number is not 3:", n)
+	}
+	x, found := tc.Get("int16")
+	if !found {
+		t.Error("int16 was not found")
+	}
+	if x.(int16) != 3 {
+		t.Error("int16 is not 3:", x)
+	}
+}
+
+func TestDecrementInt32(t *testing.T) {
+	tc := New(DefaultExpiration, 0)
+	tc.Set("int32", int32(5), DefaultExpiration)
+	n, err := tc.DecrementInt32("int32", 2)
+	if err != nil {
+		t.Error("Error decrementing:", err)
+	}
+	if n != 3 {
+		t.Error("Returned number is not 3:", n)
+	}
+	x, found := tc.Get("int32")
+	if !found {
+		t.Error("int32 was not found")
+	}
+	if x.(int32) != 3 {
+		t.Error("int32 is not 3:", x)
+	}
+}
+
+func TestDecrementInt64(t *testing.T) {
+	tc := New(DefaultExpiration, 0)
+	tc.Set("int64", int64(5), DefaultExpiration)
+	n, err := tc.DecrementInt64("int64", 2)
+	if err != nil {
+		t.Error("Error decrementing:", err)
+	}
+	if n != 3 {
+		t.Error("Returned number is not 3:", n)
+	}
+	x, found := tc.Get("int64")
+	if !found {
+		t.Error("int64 was not found")
+	}
+	if x.(int64) != 3 {
+		t.Error("int64 is not 3:", x)
+	}
+}
