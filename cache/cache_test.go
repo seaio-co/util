@@ -1068,3 +1068,41 @@ func TestDecrementUint64(t *testing.T) {
 		t.Error("uint64 is not 3:", x)
 	}
 }
+
+func TestDecrementFloat32(t *testing.T) {
+	tc := New(DefaultExpiration, 0)
+	tc.Set("float32", float32(5), DefaultExpiration)
+	n, err := tc.DecrementFloat32("float32", 2)
+	if err != nil {
+		t.Error("Error decrementing:", err)
+	}
+	if n != 3 {
+		t.Error("Returned number is not 3:", n)
+	}
+	x, found := tc.Get("float32")
+	if !found {
+		t.Error("float32 was not found")
+	}
+	if x.(float32) != 3 {
+		t.Error("float32 is not 3:", x)
+	}
+}
+
+func TestDecrementFloat64(t *testing.T) {
+	tc := New(DefaultExpiration, 0)
+	tc.Set("float64", float64(5), DefaultExpiration)
+	n, err := tc.DecrementFloat64("float64", 2)
+	if err != nil {
+		t.Error("Error decrementing:", err)
+	}
+	if n != 3 {
+		t.Error("Returned number is not 3:", n)
+	}
+	x, found := tc.Get("float64")
+	if !found {
+		t.Error("float64 was not found")
+	}
+	if x.(float64) != 3 {
+		t.Error("float64 is not 3:", x)
+	}
+}
