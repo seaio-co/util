@@ -1106,3 +1106,72 @@ func TestDecrementFloat64(t *testing.T) {
 		t.Error("float64 is not 3:", x)
 	}
 }
+
+func TestAdd(t *testing.T) {
+	tc := New(DefaultExpiration, 0)
+	err := tc.Add("foo", "bar", DefaultExpiration)
+	if err != nil {
+		t.Error("Couldn't add foo even though it shouldn't exist")
+	}
+	err = tc.Add("foo", "baz", DefaultExpiration)
+	if err == nil {
+		t.Error("Successfully added another foo when it should have returned an error")
+	}
+}
+
+func TestReplace(t *testing.T) {
+	tc := New(DefaultExpiration, 0)
+	err := tc.Replace("foo", "bar", DefaultExpiration)
+	if err == nil {
+		t.Error("Replaced foo when it shouldn't exist")
+	}
+	tc.Set("foo", "bar", DefaultExpiration)
+	err = tc.Replace("foo", "bar", DefaultExpiration)
+	if err != nil {
+		t.Error("Couldn't replace existing key foo")
+	}
+}
+
+func TestDelete(t *testing.T) {
+	tc := New(DefaultExpiration, 0)
+	tc.Set("foo", "bar", DefaultExpiration)
+	tc.Delete("foo")
+	x, found := tc.Get("foo")
+	if found {
+		t.Error("foo was found, but it should have been deleted")
+	}
+	if x != nil {
+		t.Error("x is not nil:", x)
+	}
+}
+
+func TestItemCount(t *testing.T) {
+	tc := New(DefaultExpiration, 0)
+	tc.Set("foo", "1", DefaultExpiration)
+	tc.Set("bar", "2", DefaultExpiration)
+	tc.Set("baz", "3", DefaultExpiration)
+	if n := tc.ItemCount(); n != 3 {
+		t.Errorf("Item count is not 3: %d", n)
+	}
+}
+
+func TestFlush(t *testing.T) {
+	tc := New(DefaultExpiration, 0)
+	tc.Set("foo", "bar", DefaultExpiration)
+	tc.Set("baz", "yes", DefaultExpiration)
+	tc.Flush()
+	x, found := tc.Get("foo")
+	if found {
+		t.Error("foo was found, but it should have been deleted")
+	}
+	if x != nil {
+		t.Error("x is not nil:", x)
+	}
+	x, found = tc.Get("baz")
+	if found {
+		t.Error("baz was found, but it should have been deleted")
+	}
+	if x != nil {
+		t.Error("x is not nil:", x)
+	}
+}
