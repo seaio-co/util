@@ -1175,3 +1175,32 @@ func TestFlush(t *testing.T) {
 		t.Error("x is not nil:", x)
 	}
 }
+
+func TestIncrementOverflowInt(t *testing.T) {
+	tc := New(DefaultExpiration, 0)
+	tc.Set("int8", int8(127), DefaultExpiration)
+	err := tc.Increment("int8", 1)
+	if err != nil {
+		t.Error("Error incrementing int8:", err)
+	}
+	x, _ := tc.Get("int8")
+	int8 := x.(int8)
+	if int8 != -128 {
+		t.Error("int8 did not overflow as expected; value:", int8)
+	}
+
+}
+
+func TestIncrementOverflowUint(t *testing.T) {
+	tc := New(DefaultExpiration, 0)
+	tc.Set("uint8", uint8(255), DefaultExpiration)
+	err := tc.Increment("uint8", 1)
+	if err != nil {
+		t.Error("Error incrementing int8:", err)
+	}
+	x, _ := tc.Get("uint8")
+	uint8 := x.(uint8)
+	if uint8 != 0 {
+		t.Error("uint8 did not overflow as expected; value:", uint8)
+	}
+}
