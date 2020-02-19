@@ -1204,3 +1204,17 @@ func TestIncrementOverflowUint(t *testing.T) {
 		t.Error("uint8 did not overflow as expected; value:", uint8)
 	}
 }
+
+func TestDecrementUnderflowUint(t *testing.T) {
+	tc := New(DefaultExpiration, 0)
+	tc.Set("uint8", uint8(0), DefaultExpiration)
+	err := tc.Decrement("uint8", 1)
+	if err != nil {
+		t.Error("Error decrementing int8:", err)
+	}
+	x, _ := tc.Get("uint8")
+	uint8 := x.(uint8)
+	if uint8 != 255 {
+		t.Error("uint8 did not underflow as expected; value:", uint8)
+	}
+}
