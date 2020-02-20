@@ -2,6 +2,7 @@ package cache
 
 import (
 	"bytes"
+	"io/ioutil"
 	"testing"
 	"time"
 )
@@ -1367,5 +1368,56 @@ func testFillAndSerialize(t *testing.T, tc *Cache) {
 	}
 	if s4r.Children[1].Num != 4716 {
 		t.Error("s4r.Children[1].Num is not 4716")
+	}
+}
+
+func TestFileSerialization(t *testing.T) {
+	tc := New(DefaultExpiration, 0)
+	tc.Add("a", "a", DefaultExpiration)
+	tc.Add("b", "b", DefaultExpiration)
+	f, err := ioutil.TempFile("", "go-cache-cache.dat")
+	if err != nil {
+		t.Fatal("Couldn't create cache file:", err)
+	}
+	fname := f.Name()
+	f.Close()
+	tc.SaveFile(fname)
+
+	oc := New(DefaultExpiration, 0)
+	oc.Add("a", "aa", 0) // this should not be overwritten
+	err = oc.LoadFile(fname)
+	if err != nil {
+		t.Error(err)
+	}
+	a, found := oc.Get("a")
+	if !found {
+		t.Error("a was not found")
+	}
+	astr := a.(string)
+	if astr != "aa" {
+		if astr == "a" {
+			t.Error("a was overwritten")
+		} else {
+			t.Error("a is not aa")
+		}
+	}
+	b, found := oc.Get("b")
+	if !found {
+		t.Error("b was not found")
+	}
+	if b.(string) != "b" {
+		t.Error("b is not b")
+	}
+}
+
+func TestSerializeUnserializable(t *testing.T) {
+	tc := New(DefaultExpiration, 0)
+	ch := make(chan bool, 1)
+	ch <- true
+	tc.Set("chan", ch, DefaultExpiration)
+	fp := &bytes.Buffer{}
+	err := tc.Save(fp) // this should fail gracefully
+	if err.Error() != "gob NewTypeObject can't handle type: chan bool" {
+		t.Error("Error from Save was not gob NewTypeObject can't handle type chan bool:", err)
 	}
 }
