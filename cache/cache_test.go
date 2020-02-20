@@ -3,6 +3,8 @@ package cache
 import (
 	"bytes"
 	"io/ioutil"
+	"runtime"
+	"sync"
 	"testing"
 	"time"
 )
@@ -1420,4 +1422,93 @@ func TestSerializeUnserializable(t *testing.T) {
 	if err.Error() != "gob NewTypeObject can't handle type: chan bool" {
 		t.Error("Error from Save was not gob NewTypeObject can't handle type chan bool:", err)
 	}
+}
+
+func BenchmarkCacheGetExpiring(b *testing.B) {
+	benchmarkCacheGet(b, 5*time.Minute)
+}
+
+func BenchmarkCacheGetNotExpiring(b *testing.B) {
+	benchmarkCacheGet(b, NoExpiration)
+}
+
+func benchmarkCacheGet(b *testing.B, exp time.Duration) {
+	b.StopTimer()
+	tc := New(exp, 0)
+	tc.Set("foo", "bar", DefaultExpiration)
+	b.StartTimer()
+	for i := 0; i < b.N; i++ {
+		tc.Get("foo")
+	}
+}
+
+func BenchmarkRWMutexMapGet(b *testing.B) {
+	b.StopTimer()
+	m := map[string]string{
+		"foo": "bar",
+	}
+	mu := sync.RWMutex{}
+	b.StartTimer()
+	for i := 0; i < b.N; i++ {
+		mu.RLock()
+		_, _ = m["foo"]
+		mu.RUnlock()
+	}
+}
+
+func BenchmarkRWMutexInterfaceMapGetStruct(b *testing.B) {
+	b.StopTimer()
+	s := struct{ name string }{name: "foo"}
+	m := map[interface{}]string{
+		s: "bar",
+	}
+	mu := sync.RWMutex{}
+	b.StartTimer()
+	for i := 0; i < b.N; i++ {
+		mu.RLock()
+		_, _ = m[s]
+		mu.RUnlock()
+	}
+}
+
+func BenchmarkRWMutexInterfaceMapGetString(b *testing.B) {
+	b.StopTimer()
+	m := map[interface{}]string{
+		"foo": "bar",
+	}
+	mu := sync.RWMutex{}
+	b.StartTimer()
+	for i := 0; i < b.N; i++ {
+		mu.RLock()
+		_, _ = m["foo"]
+		mu.RUnlock()
+	}
+}
+
+func BenchmarkCacheGetConcurrentExpiring(b *testing.B) {
+	benchmarkCacheGetConcurrent(b, 5*time.Minute)
+}
+
+func BenchmarkCacheGetConcurrentNotExpiring(b *testing.B) {
+	benchmarkCacheGetConcurrent(b, NoExpiration)
+}
+
+func benchmarkCacheGetConcurrent(b *testing.B, exp time.Duration) {
+	b.StopTimer()
+	tc := New(exp, 0)
+	tc.Set("foo", "bar", DefaultExpiration)
+	wg := new(sync.WaitGroup)
+	workers := runtime.NumCPU()
+	each := b.N / workers
+	wg.Add(workers)
+	b.StartTimer()
+	for i := 0; i < workers; i++ {
+		go func() {
+			for j := 0; j < each; j++ {
+				tc.Get("foo")
+			}
+			wg.Done()
+		}()
+	}
+	wg.Wait()
 }
