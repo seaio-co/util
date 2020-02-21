@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"io/ioutil"
 	"runtime"
+	"strconv"
 	"sync"
 	"testing"
 	"time"
@@ -1511,4 +1512,81 @@ func benchmarkCacheGetConcurrent(b *testing.B, exp time.Duration) {
 		}()
 	}
 	wg.Wait()
+}
+
+func BenchmarkRWMutexMapGetConcurrent(b *testing.B) {
+	b.StopTimer()
+	m := map[string]string{
+		"foo": "bar",
+	}
+	mu := sync.RWMutex{}
+	wg := new(sync.WaitGroup)
+	workers := runtime.NumCPU()
+	each := b.N / workers
+	wg.Add(workers)
+	b.StartTimer()
+	for i := 0; i < workers; i++ {
+		go func() {
+			for j := 0; j < each; j++ {
+				mu.RLock()
+				_, _ = m["foo"]
+				mu.RUnlock()
+			}
+			wg.Done()
+		}()
+	}
+	wg.Wait()
+}
+
+func BenchmarkCacheGetManyConcurrentExpiring(b *testing.B) {
+	benchmarkCacheGetManyConcurrent(b, 5*time.Minute)
+}
+
+func BenchmarkCacheGetManyConcurrentNotExpiring(b *testing.B) {
+	benchmarkCacheGetManyConcurrent(b, NoExpiration)
+}
+
+func benchmarkCacheGetManyConcurrent(b *testing.B, exp time.Duration) {
+	// This is the same as BenchmarkCacheGetConcurrent, but its result
+	// can be compared against BenchmarkShardedCacheGetManyConcurrent
+	// in sharded_test.go.
+	b.StopTimer()
+	n := 10000
+	tc := New(exp, 0)
+	keys := make([]string, n)
+	for i := 0; i < n; i++ {
+		k := "foo" + strconv.Itoa(i)
+		keys[i] = k
+		tc.Set(k, "bar", DefaultExpiration)
+	}
+	each := b.N / n
+	wg := new(sync.WaitGroup)
+	wg.Add(n)
+	for _, v := range keys {
+		go func(k string) {
+			for j := 0; j < each; j++ {
+				tc.Get(k)
+			}
+			wg.Done()
+		}(v)
+	}
+	b.StartTimer()
+	wg.Wait()
+}
+
+func BenchmarkCacheSetExpiring(b *testing.B) {
+	benchmarkCacheSet(b, 5*time.Minute)
+}
+
+func BenchmarkCacheSetNotExpiring(b *testing.B) {
+	benchmarkCacheSet(b, NoExpiration)
+}
+
+func benchmarkCacheSet(b *testing.B, exp time.Duration) {
+	b.StopTimer()
+	tc := New(exp, 0)
+	b.StartTimer()
+	for i := 0; i < b.N; i++ {
+		tc.Set("foo", "bar", DefaultExpiration)
+	}
 }
