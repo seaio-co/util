@@ -171,3 +171,102 @@ func (c *Cache) Get(key interface{}) (interface{}, bool) {
 func (c *Cache) Set(key, value interface{}, cost int64) bool {
 	return c.SetWithTTL(key, value, cost, 0*time.Second)
 }
+
+// SetWithTTL works like Set but adds a key-value pair to the cache that will expire
+// after the specified TTL (time to live) has passed. A zero value means the value never
+// expires, which is identical to calling Set. A negative value is a no-op and the value
+// is discarded.
+func (c *Cache) SetWithTTL(key, value interface{}, cost int64, ttl time.Duration) bool {
+	if c == nil || key == nil {
+		return false
+	}
+
+	var expiration time.Time
+	switch {
+	case ttl == 0:
+		// No expiration.
+		break
+	case ttl < 0:
+		// Treat this a a no-op.
+		return false
+	default:
+		expiration = time.Now().Add(ttl)
+	}
+
+	keyHash, conflictHash := c.keyToHash(key)
+	i := &item{
+		flag:       itemNew,
+		key:        keyHash,
+		conflict:   conflictHash,
+		value:      value,
+		cost:       cost,
+		expiration: expiration,
+	}
+	// cost is eventually updated. The expiration must also be immediately updated
+	// to prevent items from being prematurely removed from the map.
+	if c.store.Update(i) {
+		i.flag = itemUpdate
+	}
+	// Attempt to send item to policy.
+	select {
+	case c.setBuf <- i:
+		return true
+	default:
+		c.Metrics.add(dropSets, keyHash, 1)
+		return false
+	}
+}
+
+// Del deletes the key-value item from the cache if it exists.
+func (c *Cache) Del(key interface{}) {
+	if c == nil || key == nil {
+		return
+	}
+	keyHash, conflictHash := c.keyToHash(key)
+	// Delete immediately.
+	c.store.Del(keyHash, conflictHash)
+	// If we've set an item, it would be applied slightly later.
+	// So we must push the same item to `setBuf` with the deletion flag.
+	// This ensures that if a set is followed by a delete, it will be
+	// applied in the correct order.
+	c.setBuf <- &item{
+		flag:     itemDelete,
+		key:      keyHash,
+		conflict: conflictHash,
+	}
+}
+
+// Close stops all goroutines and closes all channels.
+func (c *Cache) Close() {
+	if c == nil || c.stop == nil {
+		return
+	}
+	// Block until processItems goroutine is returned.
+	c.stop <- struct{}{}
+	close(c.stop)
+	c.stop = nil
+	close(c.setBuf)
+	c.policy.Close()
+}
+
+// Clear empties the hashmap and zeroes all policy counters. Note that this is
+// not an atomic operation (but that shouldn't be a problem as it's assumed that
+// Set/Get calls won't be occurring until after this).
+func (c *Cache) Clear() {
+	if c == nil {
+		return
+	}
+	// Block until processItems goroutine is returned.
+	c.stop <- struct{}{}
+	// Swap out the setBuf channel.
+	c.setBuf = make(chan *item, setBufSize)
+	// Clear value hashmap and policy data.
+	c.policy.Clear()
+	c.store.Clear()
+	// Only reset metrics if they're enabled.
+	if c.Metrics != nil {
+		c.Metrics.Clear()
+	}
+	// Restart processItems goroutine.
+	go c.processItems()
+}
