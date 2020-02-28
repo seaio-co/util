@@ -274,6 +274,51 @@ func (c *Cache) Clear() {
 	go c.processItems()
 }
 
+// processItems is ran by goroutines processing the Set buffer.
+func (c *Cache) processItems() {
+	for {
+		select {
+		case i := <-c.setBuf:
+			// Calculate item cost value if new or update.
+			if i.cost == 0 && c.cost != nil && i.flag != itemDelete {
+				i.cost = c.cost(i.value)
+			}
+			switch i.flag {
+			case itemNew:
+				victims, added := c.policy.Add(i.key, i.cost)
+				if added {
+					c.store.Set(i)
+					c.Metrics.add(keyAdd, i.key, 1)
+				}
+				for _, victim := range victims {
+					victim.conflict, victim.value = c.store.Del(victim.key, 0)
+					if c.onEvict != nil {
+						c.onEvict(victim.key, victim.conflict, victim.value, victim.cost)
+					}
+				}
+
+			case itemUpdate:
+				c.policy.Update(i.key, i.cost)
+
+			case itemDelete:
+				c.policy.Del(i.key) // Deals with metrics updates.
+				c.store.Del(i.key, i.conflict)
+			}
+		case <-c.cleanupTicker.C:
+			c.store.Cleanup(c.policy, c.onEvict)
+		case <-c.stop:
+			return
+		}
+	}
+}
+
+// collectMetrics just creates a new *Metrics instance and adds the pointers
+// to the cache and policy instances.
+func (c *Cache) collectMetrics() {
+	c.Metrics = newMetrics()
+	c.policy.CollectMetrics(c.Metrics)
+}
+
 type metricType int
 
 const (
