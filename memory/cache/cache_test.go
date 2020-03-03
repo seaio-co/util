@@ -328,3 +328,288 @@ func TestCacheSet(t *testing.T) {
 	c = nil
 	require.False(t, c.Set(1, 1, 1))
 }
+
+func TestRecacheWithTTL(t *testing.T) {
+	c, err := NewCache(&Config{
+		NumCounters: 100,
+		MaxCost:     10,
+		BufferItems: 64,
+		Metrics:     true,
+	})
+
+	require.NoError(t, err)
+
+	// Set initial value for key = 1
+	insert := c.SetWithTTL(1, 1, 1, 5*time.Second)
+	require.True(t, insert)
+	time.Sleep(2 * time.Second)
+
+	// Get value from cache for key = 1
+	val, ok := c.Get(1)
+	require.True(t, ok)
+	require.NotNil(t, val)
+	require.Equal(t, 1, val)
+
+	// Wait for expiration
+	time.Sleep(5 * time.Second)
+
+	// The cached value for key = 1 should be gone
+	val, ok = c.Get(1)
+	require.False(t, ok)
+	require.Nil(t, val)
+
+	// Set new value for key = 1
+	insert = c.SetWithTTL(1, 2, 1, 5*time.Second)
+	require.True(t, insert)
+	time.Sleep(2 * time.Second)
+
+	// Get value from cache for key = 1
+	val, ok = c.Get(1)
+	require.True(t, ok)
+	require.NotNil(t, val)
+	require.Equal(t, 2, val)
+}
+
+func TestCacheSetWithTTL(t *testing.T) {
+	m := &sync.Mutex{}
+	evicted := make(map[uint64]struct{})
+	c, err := NewCache(&Config{
+		NumCounters: 100,
+		MaxCost:     10,
+		BufferItems: 64,
+		Metrics:     true,
+		OnEvict: func(key, conflict uint64, value interface{}, cost int64) {
+			m.Lock()
+			defer m.Unlock()
+			evicted[key] = struct{}{}
+		},
+	})
+	require.NoError(t, err)
+
+	retrySet(t, c, 1, 1, 1, time.Second)
+
+	// Sleep to make sure the item has expired after execution resumes.
+	time.Sleep(2 * time.Second)
+	val, ok := c.Get(1)
+	require.False(t, ok)
+	require.Nil(t, val)
+
+	// Sleep to ensure that the bucket where the item was stored has been cleared
+	// from the expiraton map.
+	time.Sleep(5 * time.Second)
+	m.Lock()
+	require.Equal(t, 1, len(evicted))
+	_, ok = evicted[1]
+	require.True(t, ok)
+	m.Unlock()
+
+	// Verify that expiration times are overwritten.
+	retrySet(t, c, 2, 1, 1, time.Second)
+	retrySet(t, c, 2, 2, 1, 100*time.Second)
+	time.Sleep(3 * time.Second)
+	val, ok = c.Get(2)
+	require.True(t, ok)
+	require.Equal(t, 2, val.(int))
+
+	// Verify that entries with no expiration are overwritten.
+	retrySet(t, c, 3, 1, 1, 0)
+	retrySet(t, c, 3, 2, 1, time.Second)
+	time.Sleep(3 * time.Second)
+	val, ok = c.Get(3)
+	require.False(t, ok)
+	require.Nil(t, val)
+}
+
+func TestCacheDel(t *testing.T) {
+	c, err := NewCache(&Config{
+		NumCounters: 100,
+		MaxCost:     10,
+		BufferItems: 64,
+	})
+	require.NoError(t, err)
+
+	c.Set(1, 1, 1)
+	c.Del(1)
+	val, ok := c.Get(1)
+	require.False(t, ok)
+	require.Nil(t, val)
+
+	c = nil
+	defer func() {
+		require.Nil(t, recover())
+	}()
+	c.Del(1)
+}
+
+func TestCacheDelWithTTL(t *testing.T) {
+	c, err := NewCache(&Config{
+		NumCounters: 100,
+		MaxCost:     10,
+		BufferItems: 64,
+	})
+	require.NoError(t, err)
+	retrySet(t, c, 3, 1, 1, 10*time.Second)
+	time.Sleep(1 * time.Second)
+	// Delete the item
+	c.Del(3)
+	// Ensure the key is deleted.
+	val, ok := c.Get(3)
+	require.False(t, ok)
+	require.Nil(t, val)
+}
+
+func TestCacheClear(t *testing.T) {
+	c, err := NewCache(&Config{
+		NumCounters: 100,
+		MaxCost:     10,
+		BufferItems: 64,
+		Metrics:     true,
+	})
+	require.NoError(t, err)
+
+	for i := 0; i < 10; i++ {
+		c.Set(i, i, 1)
+	}
+	time.Sleep(wait)
+	require.Equal(t, uint64(10), c.Metrics.KeysAdded())
+
+	c.Clear()
+	require.Equal(t, uint64(0), c.Metrics.KeysAdded())
+
+	for i := 0; i < 10; i++ {
+		val, ok := c.Get(i)
+		require.False(t, ok)
+		require.Nil(t, val)
+	}
+}
+
+func TestCacheMetrics(t *testing.T) {
+	c, err := NewCache(&Config{
+		NumCounters: 100,
+		MaxCost:     10,
+		BufferItems: 64,
+		Metrics:     true,
+	})
+	require.NoError(t, err)
+
+	for i := 0; i < 10; i++ {
+		c.Set(i, i, 1)
+	}
+	time.Sleep(wait)
+	m := c.Metrics
+	require.Equal(t, uint64(10), m.KeysAdded())
+}
+
+func TestMetrics(t *testing.T) {
+	newMetrics()
+}
+
+func TestNilMetrics(t *testing.T) {
+	var m *Metrics
+	for _, f := range []func() uint64{
+		m.Hits,
+		m.Misses,
+		m.KeysAdded,
+		m.KeysEvicted,
+		m.CostEvicted,
+		m.SetsDropped,
+		m.SetsRejected,
+		m.GetsDropped,
+		m.GetsKept,
+	} {
+		require.Equal(t, uint64(0), f())
+	}
+}
+
+func TestMetricsAddGet(t *testing.T) {
+	m := newMetrics()
+	m.add(hit, 1, 1)
+	m.add(hit, 2, 2)
+	m.add(hit, 3, 3)
+	require.Equal(t, uint64(6), m.Hits())
+
+	m = nil
+	m.add(hit, 1, 1)
+	require.Equal(t, uint64(0), m.Hits())
+}
+
+func TestMetricsRatio(t *testing.T) {
+	m := newMetrics()
+	require.Equal(t, float64(0), m.Ratio())
+
+	m.add(hit, 1, 1)
+	m.add(hit, 2, 2)
+	m.add(miss, 1, 1)
+	m.add(miss, 2, 2)
+	require.Equal(t, 0.5, m.Ratio())
+
+	m = nil
+	require.Equal(t, float64(0), m.Ratio())
+}
+
+func TestMetricsString(t *testing.T) {
+	m := newMetrics()
+	m.add(hit, 1, 1)
+	m.add(miss, 1, 1)
+	m.add(keyAdd, 1, 1)
+	m.add(keyUpdate, 1, 1)
+	m.add(keyEvict, 1, 1)
+	m.add(costAdd, 1, 1)
+	m.add(costEvict, 1, 1)
+	m.add(dropSets, 1, 1)
+	m.add(rejectSets, 1, 1)
+	m.add(dropGets, 1, 1)
+	m.add(keepGets, 1, 1)
+	require.Equal(t, uint64(1), m.Hits())
+	require.Equal(t, uint64(1), m.Misses())
+	require.Equal(t, 0.5, m.Ratio())
+	require.Equal(t, uint64(1), m.KeysAdded())
+	require.Equal(t, uint64(1), m.KeysUpdated())
+	require.Equal(t, uint64(1), m.KeysEvicted())
+	require.Equal(t, uint64(1), m.CostAdded())
+	require.Equal(t, uint64(1), m.CostEvicted())
+	require.Equal(t, uint64(1), m.SetsDropped())
+	require.Equal(t, uint64(1), m.SetsRejected())
+	require.Equal(t, uint64(1), m.GetsDropped())
+	require.Equal(t, uint64(1), m.GetsKept())
+
+	require.NotEqual(t, 0, len(m.String()))
+
+	m = nil
+	require.Equal(t, 0, len(m.String()))
+
+	require.Equal(t, "unidentified", stringFor(doNotUse))
+}
+
+func TestCacheMetricsClear(t *testing.T) {
+	c, err := NewCache(&Config{
+		NumCounters: 100,
+		MaxCost:     10,
+		BufferItems: 64,
+		Metrics:     true,
+	})
+	require.NoError(t, err)
+
+	c.Set(1, 1, 1)
+	stop := make(chan struct{})
+	go func() {
+		for {
+			select {
+			case <-stop:
+				return
+			default:
+				c.Get(1)
+			}
+		}
+	}()
+	time.Sleep(wait)
+	c.Clear()
+	stop <- struct{}{}
+	c.Metrics = nil
+	c.Metrics.Clear()
+}
+
+func init() {
+	// Set bucketSizeSecs to 1 to avoid waiting too much during the tests.
+	bucketDurationSecs = 1
+}
