@@ -178,3 +178,53 @@ func (p *defaultPolicy) Add(key uint64, cost int64) ([]*item, bool) {
 	p.metrics.add(costAdd, key, uint64(cost))
 	return victims, true
 }
+
+func (p *defaultPolicy) Has(key uint64) bool {
+	p.Lock()
+	_, exists := p.evict.keyCosts[key]
+	p.Unlock()
+	return exists
+}
+
+func (p *defaultPolicy) Del(key uint64) {
+	p.Lock()
+	p.evict.del(key)
+	p.Unlock()
+}
+
+func (p *defaultPolicy) Cap() int64 {
+	p.Lock()
+	capacity := int64(p.evict.maxCost - p.evict.used)
+	p.Unlock()
+	return capacity
+}
+
+func (p *defaultPolicy) Update(key uint64, cost int64) {
+	p.Lock()
+	p.evict.updateIfHas(key, cost)
+	p.Unlock()
+}
+
+func (p *defaultPolicy) Cost(key uint64) int64 {
+	p.Lock()
+	if cost, found := p.evict.keyCosts[key]; found {
+		p.Unlock()
+		return cost
+	}
+	p.Unlock()
+	return -1
+}
+
+func (p *defaultPolicy) Clear() {
+	p.Lock()
+	p.admit.clear()
+	p.evict.clear()
+	p.Unlock()
+}
+
+func (p *defaultPolicy) Close() {
+	// Block until the p.processItems goroutine returns.
+	p.stop <- struct{}{}
+	close(p.stop)
+	close(p.itemsCh)
+}
