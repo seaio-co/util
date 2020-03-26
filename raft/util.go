@@ -1,6 +1,7 @@
 package raft
 
 import (
+	"bytes"
 	crand "crypto/rand"
 	"fmt"
 	"math"
@@ -91,3 +92,58 @@ func asyncNotifyBool(ch chan bool, v bool) {
 	default:
 	}
 }
+
+// overrideNotifyBool is used to notify on a bool channel
+// but override existing value if value is present.
+// ch must be 1-item buffered channel.
+//
+// This method does not support multiple concurrent calls.
+func overrideNotifyBool(ch chan bool, v bool) {
+	select {
+	case ch <- v:
+		// value sent, all done
+	case <-ch:
+		// channel had an old value
+		select {
+		case ch <- v:
+		default:
+			panic("race: channel was sent concurrently")
+		}
+	}
+}
+
+// Decode reverses the encode operation on a byte slice input.
+func decodeMsgPack(buf []byte, out interface{}) error {
+	r := bytes.NewBuffer(buf)
+	hd := codec.MsgpackHandle{}
+	dec := codec.NewDecoder(r, &hd)
+	return dec.Decode(out)
+}
+
+// Encode writes an encoded object to a new bytes buffer.
+func encodeMsgPack(in interface{}) (*bytes.Buffer, error) {
+	buf := bytes.NewBuffer(nil)
+	hd := codec.MsgpackHandle{}
+	enc := codec.NewEncoder(buf, &hd)
+	err := enc.Encode(in)
+	return buf, err
+}
+
+// backoff is used to compute an exponential backoff
+// duration. Base time is scaled by the current round,
+// up to some maximum scale factor.
+func backoff(base time.Duration, round, limit uint64) time.Duration {
+	power := min(round, limit)
+	for power > 2 {
+		base *= 2
+		power--
+	}
+	return base
+}
+
+// Needed for sorting []uint64, used to determine commitment
+type uint64Slice []uint64
+
+func (p uint64Slice) Len() int           { return len(p) }
+func (p uint64Slice) Less(i, j int) bool { return p[i] < p[j] }
+func (p uint64Slice) Swap(i, j int)      { p[i], p[j] = p[j], p[i] }
