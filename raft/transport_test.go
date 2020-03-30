@@ -1,0 +1,94 @@
+package raft
+
+import (
+	"reflect"
+	"testing"
+	"time"
+)
+
+const (
+	TTInmem = iota
+
+	// NOTE: must be last
+	numTestTransports
+)
+
+func NewTestTransport(ttype int, addr ServerAddress) (ServerAddress, LoopbackTransport) {
+	switch ttype {
+	case TTInmem:
+		return NewInmemTransport(addr)
+	default:
+		panic("Unknown transport type")
+	}
+}
+
+func TestTransport_StartStop(t *testing.T) {
+	for ttype := 0; ttype < numTestTransports; ttype++ {
+		_, trans := NewTestTransport(ttype, "")
+		if err := trans.Close(); err != nil {
+			t.Fatalf("err: %v", err)
+		}
+	}
+}
+
+func TestTransport_AppendEntries(t *testing.T) {
+	for ttype := 0; ttype < numTestTransports; ttype++ {
+		addr1, trans1 := NewTestTransport(ttype, "")
+		defer trans1.Close()
+		rpcCh := trans1.Consumer()
+
+		// Make the RPC request
+		args := AppendEntriesRequest{
+			Term:         10,
+			Leader:       []byte("cartman"),
+			PrevLogEntry: 100,
+			PrevLogTerm:  4,
+			Entries: []*Log{
+				{
+					Index: 101,
+					Term:  4,
+					Type:  LogNoop,
+				},
+			},
+			LeaderCommitIndex: 90,
+		}
+		resp := AppendEntriesResponse{
+			Term:    4,
+			LastLog: 90,
+			Success: true,
+		}
+
+		// Listen for a request
+		go func() {
+			select {
+			case rpc := <-rpcCh:
+				// Verify the command
+				req := rpc.Command.(*AppendEntriesRequest)
+				if !reflect.DeepEqual(req, &args) {
+					t.Fatalf("command mismatch: %#v %#v", *req, args)
+				}
+				rpc.Respond(&resp, nil)
+
+			case <-time.After(200 * time.Millisecond):
+				t.Fatalf("timeout")
+			}
+		}()
+
+		// Transport 2 makes outbound request
+		addr2, trans2 := NewTestTransport(ttype, "")
+		defer trans2.Close()
+
+		trans1.Connect(addr2, trans2)
+		trans2.Connect(addr1, trans1)
+
+		var out AppendEntriesResponse
+		if err := trans2.AppendEntries("id1", trans1.LocalAddr(), &args, &out); err != nil {
+			t.Fatalf("err: %v", err)
+		}
+
+		// Verify the response
+		if !reflect.DeepEqual(resp, out) {
+			t.Fatalf("command mismatch: %#v %#v", resp, out)
+		}
+	}
+}
