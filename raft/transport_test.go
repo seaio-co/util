@@ -1,6 +1,7 @@
 package raft
 
 import (
+	"bytes"
 	"reflect"
 	"testing"
 	"time"
@@ -216,6 +217,74 @@ func TestTransport_RequestVote(t *testing.T) {
 
 		var out RequestVoteResponse
 		if err := trans2.RequestVote("id1", trans1.LocalAddr(), &args, &out); err != nil {
+			t.Fatalf("err: %v", err)
+		}
+
+		// Verify the response
+		if !reflect.DeepEqual(resp, out) {
+			t.Fatalf("command mismatch: %#v %#v", resp, out)
+		}
+	}
+}
+
+func TestTransport_InstallSnapshot(t *testing.T) {
+	for ttype := 0; ttype < numTestTransports; ttype++ {
+		addr1, trans1 := NewTestTransport(ttype, "")
+		defer trans1.Close()
+		rpcCh := trans1.Consumer()
+
+		// Make the RPC request
+		args := InstallSnapshotRequest{
+			Term:         10,
+			Leader:       []byte("kyle"),
+			LastLogIndex: 100,
+			LastLogTerm:  9,
+			Peers:        []byte("blah blah"),
+			Size:         10,
+		}
+		resp := InstallSnapshotResponse{
+			Term:    10,
+			Success: true,
+		}
+
+		// Listen for a request
+		go func() {
+			select {
+			case rpc := <-rpcCh:
+				// Verify the command
+				req := rpc.Command.(*InstallSnapshotRequest)
+				if !reflect.DeepEqual(req, &args) {
+					t.Fatalf("command mismatch: %#v %#v", *req, args)
+				}
+
+				// Try to read the bytes
+				buf := make([]byte, 10)
+				rpc.Reader.Read(buf)
+
+				// Compare
+				if bytes.Compare(buf, []byte("0123456789")) != 0 {
+					t.Fatalf("bad buf %v", buf)
+				}
+
+				rpc.Respond(&resp, nil)
+
+			case <-time.After(200 * time.Millisecond):
+				t.Fatalf("timeout")
+			}
+		}()
+
+		// Transport 2 makes outbound request
+		addr2, trans2 := NewTestTransport(ttype, "")
+		defer trans2.Close()
+
+		trans1.Connect(addr2, trans2)
+		trans2.Connect(addr1, trans1)
+
+		// Create a buffer
+		buf := bytes.NewBuffer([]byte("0123456789"))
+
+		var out InstallSnapshotResponse
+		if err := trans2.InstallSnapshot("id1", trans1.LocalAddr(), &args, &out, buf); err != nil {
 			t.Fatalf("err: %v", err)
 		}
 
