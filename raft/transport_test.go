@@ -294,3 +294,18 @@ func TestTransport_InstallSnapshot(t *testing.T) {
 		}
 	}
 }
+
+func TestTransport_EncodeDecode(t *testing.T) {
+	for ttype := 0; ttype < numTestTransports; ttype++ {
+		_, trans1 := NewTestTransport(ttype, "")
+		defer trans1.Close()
+
+		local := trans1.LocalAddr()
+		enc := trans1.EncodePeer("aaaa", local)
+		dec := trans1.DecodePeer(enc)
+
+		if dec != local {
+			t.Fatalf("enc/dec fail: %v %v", dec, local)
+		}
+	}
+}
