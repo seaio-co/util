@@ -58,3 +58,58 @@ func NewTCPTransportWithConfig(
 		return NewNetworkTransportWithConfig(config)
 	})
 }
+
+func newTCPTransport(bindAddr string,
+	advertise net.Addr,
+	transportCreator func(stream StreamLayer) *NetworkTransport) (*NetworkTransport, error) {
+	// Try to bind
+	list, err := net.Listen("tcp", bindAddr)
+	if err != nil {
+		return nil, err
+	}
+
+	// Create stream
+	stream := &TCPStreamLayer{
+		advertise: advertise,
+		listener:  list.(*net.TCPListener),
+	}
+
+	// Verify that we have a usable advertise address
+	addr, ok := stream.Addr().(*net.TCPAddr)
+	if !ok {
+		list.Close()
+		return nil, errNotTCP
+	}
+	if addr.IP.IsUnspecified() {
+		list.Close()
+		return nil, errNotAdvertisable
+	}
+
+	// Create the network transport
+	trans := transportCreator(stream)
+	return trans, nil
+}
+
+// Dial implements the StreamLayer interface.
+func (t *TCPStreamLayer) Dial(address ServerAddress, timeout time.Duration) (net.Conn, error) {
+	return net.DialTimeout("tcp", string(address), timeout)
+}
+
+// Accept implements the net.Listener interface.
+func (t *TCPStreamLayer) Accept() (c net.Conn, err error) {
+	return t.listener.Accept()
+}
+
+// Close implements the net.Listener interface.
+func (t *TCPStreamLayer) Close() (err error) {
+	return t.listener.Close()
+}
+
+// Addr implements the net.Listener interface.
+func (t *TCPStreamLayer) Addr() net.Addr {
+	// Use an advertise addr if provided
+	if t.advertise != nil {
+		return t.advertise
+	}
+	return t.listener.Addr()
+}
