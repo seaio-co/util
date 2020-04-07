@@ -120,3 +120,19 @@ func (r *raftState) setLastSnapshot(index, term uint64) {
 	r.lastSnapshotTerm = term
 	r.lastLock.Unlock()
 }
+
+func (r *raftState) getCommitIndex() uint64 {
+	return atomic.LoadUint64(&r.commitIndex)
+}
+
+func (r *raftState) setCommitIndex(index uint64) {
+	atomic.StoreUint64(&r.commitIndex, index)
+}
+
+func (r *raftState) getLastApplied() uint64 {
+	return atomic.LoadUint64(&r.lastApplied)
+}
+
+func (r *raftState) setLastApplied(index uint64) {
+	atomic.StoreUint64(&r.lastApplied, index)
+}
