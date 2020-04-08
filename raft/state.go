@@ -150,3 +150,22 @@ func (r *raftState) goFunc(f func()) {
 func (r *raftState) waitShutdown() {
 	r.routinesGroup.Wait()
 }
+
+// getLastIndex returns the last index in stable storage.
+// Either from the last log or from the last snapshot.
+func (r *raftState) getLastIndex() uint64 {
+	r.lastLock.Lock()
+	defer r.lastLock.Unlock()
+	return max(r.lastLogIndex, r.lastSnapshotIndex)
+}
+
+// getLastEntry returns the last index and term in stable storage.
+// Either from the last log or from the last snapshot.
+func (r *raftState) getLastEntry() (uint64, uint64) {
+	r.lastLock.Lock()
+	defer r.lastLock.Unlock()
+	if r.lastLogIndex >= r.lastSnapshotIndex {
+		return r.lastLogIndex, r.lastLogTerm
+	}
+	return r.lastSnapshotIndex, r.lastSnapshotTerm
+}
