@@ -48,3 +48,9 @@ type SnapshotStore interface {
 	// called it is assumed the snapshot is no longer needed.
 	Open(id string) (*SnapshotMeta, io.ReadCloser, error)
 }
+
+type SnapshotSink interface {
+	io.WriteCloser
+	ID() string
+	Cancel() error
+}
