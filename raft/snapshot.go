@@ -1,5 +1,7 @@
 package raft
 
+import "io"
+
 // SnapshotMeta is for metadata of a snapshot.
 type SnapshotMeta struct {
 	// Version is the version number of the snapshot metadata. This does not cover
@@ -25,4 +27,24 @@ type SnapshotMeta struct {
 
 	// Size is the size of the snapshot in bytes.
 	Size int64
+}
+
+// SnapshotStore interface is used to allow for flexible implementations
+// of snapshot storage and retrieval. For example, a client could implement
+// a shared state store such as S3, allowing new nodes to restore snapshots
+// without streaming from the leader.
+type SnapshotStore interface {
+	// Create is used to begin a snapshot at a given index and term, and with
+	// the given committed configuration. The version parameter controls
+	// which snapshot version to create.
+	Create(version SnapshotVersion, index, term uint64, configuration Configuration,
+		configurationIndex uint64, trans Transport) (SnapshotSink, error)
+
+	// List is used to list the available snapshots in the store.
+	// It should return then in descending order, with the highest index first.
+	List() ([]*SnapshotMeta, error)
+
+	// Open takes a snapshot ID and provides a ReadCloser. Once close is
+	// called it is assumed the snapshot is no longer needed.
+	Open(id string) (*SnapshotMeta, io.ReadCloser, error)
 }
