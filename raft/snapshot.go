@@ -89,3 +89,21 @@ func (r *Raft) runSnapshots() {
 		}
 	}
 }
+
+// shouldSnapshot checks if we meet the conditions to take
+// a new snapshot.
+func (r *Raft) shouldSnapshot() bool {
+	// Check the last snapshot index
+	lastSnap, _ := r.getLastSnapshot()
+
+	// Check the last log index
+	lastIdx, err := r.logs.LastIndex()
+	if err != nil {
+		r.logger.Error("failed to get last log index", "error", err)
+		return false
+	}
+
+	// Compare the delta to the threshold
+	delta := lastIdx - lastSnap
+	return delta >= r.conf.SnapshotThreshold
+}
