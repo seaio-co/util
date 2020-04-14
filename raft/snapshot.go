@@ -54,3 +54,38 @@ type SnapshotSink interface {
 	ID() string
 	Cancel() error
 }
+
+// runSnapshots is a long running goroutine used to manage taking
+// new snapshots of the FSM. It runs in parallel to the FSM and
+// main goroutines, so that snapshots do not block normal operation.
+func (r *Raft) runSnapshots() {
+	for {
+		select {
+		case <-randomTimeout(r.conf.SnapshotInterval):
+			// Check if we should snapshot
+			if !r.shouldSnapshot() {
+				continue
+			}
+
+			// Trigger a snapshot
+			if _, err := r.takeSnapshot(); err != nil {
+				r.logger.Error("failed to take snapshot", "error", err)
+			}
+
+		case future := <-r.userSnapshotCh:
+			// User-triggered, run immediately
+			id, err := r.takeSnapshot()
+			if err != nil {
+				r.logger.Error("failed to take snapshot", "error", err)
+			} else {
+				future.opener = func() (*SnapshotMeta, io.ReadCloser, error) {
+					return r.snapshots.Open(id)
+				}
+			}
+			future.respond(err)
+
+		case <-r.shutdownCh:
+			return
+		}
+	}
+}
