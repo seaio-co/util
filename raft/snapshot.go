@@ -107,3 +107,94 @@ func (r *Raft) shouldSnapshot() bool {
 	delta := lastIdx - lastSnap
 	return delta >= r.conf.SnapshotThreshold
 }
+
+// takeSnapshot is used to take a new snapshot. This must only be called from
+// the snapshot thread, never the main thread. This returns the ID of the new
+// snapshot, along with an error.
+func (r *Raft) takeSnapshot() (string, error) {
+	defer metrics.MeasureSince([]string{"raft", "snapshot", "takeSnapshot"}, time.Now())
+
+	// Create a request for the FSM to perform a snapshot.
+	snapReq := &reqSnapshotFuture{}
+	snapReq.init()
+
+	// Wait for dispatch or shutdown.
+	select {
+	case r.fsmSnapshotCh <- snapReq:
+	case <-r.shutdownCh:
+		return "", ErrRaftShutdown
+	}
+
+	// Wait until we get a response
+	if err := snapReq.Error(); err != nil {
+		if err != ErrNothingNewToSnapshot {
+			err = fmt.Errorf("failed to start snapshot: %v", err)
+		}
+		return "", err
+	}
+	defer snapReq.snapshot.Release()
+
+	// Make a request for the configurations and extract the committed info.
+	// We have to use the future here to safely get this information since
+	// it is owned by the main thread.
+	configReq := &configurationsFuture{}
+	configReq.ShutdownCh = r.shutdownCh
+	configReq.init()
+	select {
+	case r.configurationsCh <- configReq:
+	case <-r.shutdownCh:
+		return "", ErrRaftShutdown
+	}
+	if err := configReq.Error(); err != nil {
+		return "", err
+	}
+	committed := configReq.configurations.committed
+	committedIndex := configReq.configurations.committedIndex
+
+	// We don't support snapshots while there's a config change outstanding
+	// since the snapshot doesn't have a means to represent this state. This
+	// is a little weird because we need the FSM to apply an index that's
+	// past the configuration change, even though the FSM itself doesn't see
+	// the configuration changes. It should be ok in practice with normal
+	// application traffic flowing through the FSM. If there's none of that
+	// then it's not crucial that we snapshot, since there's not much going
+	// on Raft-wise.
+	if snapReq.index < committedIndex {
+		return "", fmt.Errorf("cannot take snapshot now, wait until the configuration entry at %v has been applied (have applied %v)",
+			committedIndex, snapReq.index)
+	}
+
+	// Create a new snapshot.
+	r.logger.Info("starting snapshot up to", "index", snapReq.index)
+	start := time.Now()
+	version := getSnapshotVersion(r.protocolVersion)
+	sink, err := r.snapshots.Create(version, snapReq.index, snapReq.term, committed, committedIndex, r.trans)
+	if err != nil {
+		return "", fmt.Errorf("failed to create snapshot: %v", err)
+	}
+	metrics.MeasureSince([]string{"raft", "snapshot", "create"}, start)
+
+	// Try to persist the snapshot.
+	start = time.Now()
+	if err := snapReq.snapshot.Persist(sink); err != nil {
+		sink.Cancel()
+		return "", fmt.Errorf("failed to persist snapshot: %v", err)
+	}
+	metrics.MeasureSince([]string{"raft", "snapshot", "persist"}, start)
+
+	// Close and check for error.
+	if err := sink.Close(); err != nil {
+		return "", fmt.Errorf("failed to close snapshot: %v", err)
+	}
+
+	// Update the last stable snapshot info.
+	r.setLastSnapshot(snapReq.index, snapReq.term)
+
+	// Compact the logs.
+	if err := r.compactLogs(snapReq.index); err != nil {
+		return "", err
+	}
+
+	r.logger.Info("snapshot complete up to", "index", snapReq.index)
+	return sink.ID(), nil
+}
