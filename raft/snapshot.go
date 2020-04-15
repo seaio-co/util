@@ -1,6 +1,10 @@
 package raft
 
-import "io"
+import (
+	"fmt"
+	"io"
+	"time"
+)
 
 // SnapshotMeta is for metadata of a snapshot.
 type SnapshotMeta struct {
@@ -197,4 +201,40 @@ func (r *Raft) takeSnapshot() (string, error) {
 
 	r.logger.Info("snapshot complete up to", "index", snapReq.index)
 	return sink.ID(), nil
+}
+
+// compactLogs takes the last inclusive index of a snapshot
+// and trims the logs that are no longer needed.
+func (r *Raft) compactLogs(snapIdx uint64) error {
+	defer metrics.MeasureSince([]string{"raft", "compactLogs"}, time.Now())
+	// Determine log ranges to compact
+	minLog, err := r.logs.FirstIndex()
+	if err != nil {
+		return fmt.Errorf("failed to get first log index: %v", err)
+	}
+
+	// Check if we have enough logs to truncate
+	lastLogIdx, _ := r.getLastLog()
+	if lastLogIdx <= r.conf.TrailingLogs {
+		return nil
+	}
+
+	// Truncate up to the end of the snapshot, or `TrailingLogs`
+	// back from the head, which ever is further back. This ensures
+	// at least `TrailingLogs` entries, but does not allow logs
+	// after the snapshot to be removed.
+	maxLog := min(snapIdx, lastLogIdx-r.conf.TrailingLogs)
+
+	if minLog > maxLog {
+		r.logger.Info("no logs to truncate")
+		return nil
+	}
+
+	r.logger.Info("compacting logs", "from", minLog, "to", maxLog)
+
+	// Compact the logs
+	if err := r.logs.DeleteRange(minLog, maxLog); err != nil {
+		return fmt.Errorf("log compaction failed: %v", err)
+	}
+	return nil
 }
