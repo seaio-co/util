@@ -85,3 +85,18 @@ type followerReplication struct {
 	// It is private to this replication goroutine.
 	allowPipeline bool
 }
+
+// notifyAll is used to notify all the waiting verify futures
+// if the follower believes we are still the leader.
+func (s *followerReplication) notifyAll(leader bool) {
+	// Clear the waiting notifies minimizing lock time
+	s.notifyLock.Lock()
+	n := s.notify
+	s.notify = make(map[*verifyFuture]struct{})
+	s.notifyLock.Unlock()
+
+	// Submit our votes
+	for v := range n {
+		v.vote(leader)
+	}
+}
