@@ -100,3 +100,18 @@ func (s *followerReplication) notifyAll(leader bool) {
 		v.vote(leader)
 	}
 }
+
+// cleanNotify is used to delete notify, .
+func (s *followerReplication) cleanNotify(v *verifyFuture) {
+	s.notifyLock.Lock()
+	delete(s.notify, v)
+	s.notifyLock.Unlock()
+}
+
+// LastContact returns the time of last contact.
+func (s *followerReplication) LastContact() time.Time {
+	s.lastContactLock.RLock()
+	last := s.lastContact
+	s.lastContactLock.RUnlock()
+	return last
+}
