@@ -115,3 +115,10 @@ func (s *followerReplication) LastContact() time.Time {
 	s.lastContactLock.RUnlock()
 	return last
 }
+
+// setLastContact sets the last contact to the current time.
+func (s *followerReplication) setLastContact() {
+	s.lastContactLock.Lock()
+	s.lastContact = time.Now()
+	s.lastContactLock.Unlock()
+}
