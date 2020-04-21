@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"sync"
+	"sync/atomic"
 	"time"
 )
 
@@ -183,4 +184,96 @@ PIPELINE:
 		}
 	}
 	goto RPC
+}
+
+// replicateTo is a helper to replicate(), used to replicate the logs up to a
+// given last index.
+// If the follower log is behind, we take care to bring them up to date.
+func (r *Raft) replicateTo(s *followerReplication, lastIndex uint64) (shouldStop bool) {
+	// Create the base request
+	var req AppendEntriesRequest
+	var resp AppendEntriesResponse
+	var start time.Time
+START:
+	// Prevent an excessive retry rate on errors
+	if s.failures > 0 {
+		select {
+		case <-time.After(backoff(failureWait, s.failures, maxFailureScale)):
+		case <-r.shutdownCh:
+		}
+	}
+
+	// Setup the request
+	if err := r.setupAppendEntries(s, &req, atomic.LoadUint64(&s.nextIndex), lastIndex); err == ErrLogNotFound {
+		goto SEND_SNAP
+	} else if err != nil {
+		return
+	}
+
+	// Make the RPC call
+	start = time.Now()
+	if err := r.trans.AppendEntries(s.peer.ID, s.peer.Address, &req, &resp); err != nil {
+		r.logger.Error("failed to appendEntries to", "peer", s.peer, "error", err)
+		s.failures++
+		return
+	}
+	appendStats(string(s.peer.ID), start, float32(len(req.Entries)))
+
+	// Check for a newer term, stop running
+	if resp.Term > req.Term {
+		r.handleStaleTerm(s)
+		return true
+	}
+
+	// Update the last contact
+	s.setLastContact()
+
+	// Update s based on success
+	if resp.Success {
+		// Update our replication state
+		updateLastAppended(s, &req)
+
+		// Clear any failures, allow pipelining
+		s.failures = 0
+		s.allowPipeline = true
+	} else {
+		atomic.StoreUint64(&s.nextIndex, max(min(s.nextIndex-1, resp.LastLog+1), 1))
+		if resp.NoRetryBackoff {
+			s.failures = 0
+		} else {
+			s.failures++
+		}
+		r.logger.Warn("appendEntries rejected, sending older logs", "peer", s.peer, "next", atomic.LoadUint64(&s.nextIndex))
+	}
+
+CHECK_MORE:
+	// Poll the stop channel here in case we are looping and have been asked
+	// to stop, or have stepped down as leader. Even for the best effort case
+	// where we are asked to replicate to a given index and then shutdown,
+	// it's better to not loop in here to send lots of entries to a straggler
+	// that's leaving the cluster anyways.
+	select {
+	case <-s.stopCh:
+		return true
+	default:
+	}
+
+	// Check if there are more logs to replicate
+	if atomic.LoadUint64(&s.nextIndex) <= lastIndex {
+		goto START
+	}
+	return
+
+	// SEND_SNAP is used when we fail to get a log, usually because the follower
+	// is too far behind, and we must ship a snapshot down instead
+SEND_SNAP:
+	if stop, err := r.sendLatestSnapshot(s); stop {
+		return true
+	} else if err != nil {
+		r.logger.Error("failed to send snapshot to", "peer", s.peer, "error", err)
+		return
+	}
+
+	// Check if there is more to replicate
+	goto CHECK_MORE
 }
