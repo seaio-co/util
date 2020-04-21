@@ -2,6 +2,7 @@ package raft
 
 import (
 	"errors"
+	"fmt"
 	"sync"
 	"time"
 )
@@ -121,4 +122,65 @@ func (s *followerReplication) setLastContact() {
 	s.lastContactLock.Lock()
 	s.lastContact = time.Now()
 	s.lastContactLock.Unlock()
+}
+
+// replicate is a long running routine that replicates log entries to a single
+// follower.
+func (r *Raft) replicate(s *followerReplication) {
+	// Start an async heartbeating routing
+	stopHeartbeat := make(chan struct{})
+	defer close(stopHeartbeat)
+	r.goFunc(func() { r.heartbeat(s, stopHeartbeat) })
+
+RPC:
+	shouldStop := false
+	for !shouldStop {
+		select {
+		case maxIndex := <-s.stopCh:
+			// Make a best effort to replicate up to this index
+			if maxIndex > 0 {
+				r.replicateTo(s, maxIndex)
+			}
+			return
+		case deferErr := <-s.triggerDeferErrorCh:
+			lastLogIdx, _ := r.getLastLog()
+			shouldStop = r.replicateTo(s, lastLogIdx)
+			if !shouldStop {
+				deferErr.respond(nil)
+			} else {
+				deferErr.respond(fmt.Errorf("replication failed"))
+			}
+		case <-s.triggerCh:
+			lastLogIdx, _ := r.getLastLog()
+			shouldStop = r.replicateTo(s, lastLogIdx)
+		// This is _not_ our heartbeat mechanism but is to ensure
+		// followers quickly learn the leader's commit index when
+		// raft commits stop flowing naturally. The actual heartbeats
+		// can't do this to keep them unblocked by disk IO on the
+		// follower. See https://github.com/hashicorp/raft/issues/282.
+		case <-randomTimeout(r.conf.CommitTimeout):
+			lastLogIdx, _ := r.getLastLog()
+			shouldStop = r.replicateTo(s, lastLogIdx)
+		}
+
+		// If things looks healthy, switch to pipeline mode
+		if !shouldStop && s.allowPipeline {
+			goto PIPELINE
+		}
+	}
+	return
+
+PIPELINE:
+	// Disable until re-enabled
+	s.allowPipeline = false
+
+	// Replicates using a pipeline for high performance. This method
+	// is not able to gracefully recover from errors, and so we fall back
+	// to standard mode on failure.
+	if err := r.pipelineReplicate(s); err != nil {
+		if err != ErrPipelineReplicationNotSupported {
+			r.logger.Error("failed to start pipeline replication to", "peer", s.peer, "error", err)
+		}
+	}
+	goto RPC
 }
