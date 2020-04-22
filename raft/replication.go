@@ -277,3 +277,78 @@ SEND_SNAP:
 	// Check if there is more to replicate
 	goto CHECK_MORE
 }
+
+// sendLatestSnapshot is used to send the latest snapshot we have
+// down to our follower.
+func (r *Raft) sendLatestSnapshot(s *followerReplication) (bool, error) {
+	// Get the snapshots
+	snapshots, err := r.snapshots.List()
+	if err != nil {
+		r.logger.Error("failed to list snapshots", "error", err)
+		return false, err
+	}
+
+	// Check we have at least a single snapshot
+	if len(snapshots) == 0 {
+		return false, fmt.Errorf("no snapshots found")
+	}
+
+	// Open the most recent snapshot
+	snapID := snapshots[0].ID
+	meta, snapshot, err := r.snapshots.Open(snapID)
+	if err != nil {
+		r.logger.Error("failed to open snapshot", "id", snapID, "error", err)
+		return false, err
+	}
+	defer snapshot.Close()
+
+	// Setup the request
+	req := InstallSnapshotRequest{
+		RPCHeader:          r.getRPCHeader(),
+		SnapshotVersion:    meta.Version,
+		Term:               s.currentTerm,
+		Leader:             r.trans.EncodePeer(r.localID, r.localAddr),
+		LastLogIndex:       meta.Index,
+		LastLogTerm:        meta.Term,
+		Peers:              meta.Peers,
+		Size:               meta.Size,
+		Configuration:      EncodeConfiguration(meta.Configuration),
+		ConfigurationIndex: meta.ConfigurationIndex,
+	}
+
+	// Make the call
+	start := time.Now()
+	var resp InstallSnapshotResponse
+	if err := r.trans.InstallSnapshot(s.peer.ID, s.peer.Address, &req, &resp, snapshot); err != nil {
+		r.logger.Error("failed to install snapshot", "id", snapID, "error", err)
+		s.failures++
+		return false, err
+	}
+	metrics.MeasureSince([]string{"raft", "replication", "installSnapshot", string(s.peer.ID)}, start)
+
+	// Check for a newer term, stop running
+	if resp.Term > req.Term {
+		r.handleStaleTerm(s)
+		return true, nil
+	}
+
+	// Update the last contact
+	s.setLastContact()
+
+	// Check for success
+	if resp.Success {
+		// Update the indexes
+		atomic.StoreUint64(&s.nextIndex, meta.Index+1)
+		s.commitment.match(s.peer.ID, meta.Index)
+
+		// Clear any failures
+		s.failures = 0
+
+		// Notify we are still leader
+		s.notifyAll(true)
+	} else {
+		s.failures++
+		r.logger.Warn("installSnapshot rejected to", "peer", s.peer)
+	}
+	return false, nil
+}
