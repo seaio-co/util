@@ -389,3 +389,67 @@ func (r *Raft) heartbeat(s *followerReplication, stopCh chan struct{}) {
 		}
 	}
 }
+
+// pipelineReplicate is used when we have synchronized our state with the follower,
+// and want to switch to a higher performance pipeline mode of replication.
+// We only pipeline AppendEntries commands, and if we ever hit an error, we fall
+// back to the standard replication which can handle more complex situations.
+func (r *Raft) pipelineReplicate(s *followerReplication) error {
+	// Create a new pipeline
+	pipeline, err := r.trans.AppendEntriesPipeline(s.peer.ID, s.peer.Address)
+	if err != nil {
+		return err
+	}
+	defer pipeline.Close()
+
+	// Log start and stop of pipeline
+	r.logger.Info("pipelining replication", "peer", s.peer)
+	defer r.logger.Info("aborting pipeline replication", "peer", s.peer)
+
+	// Create a shutdown and finish channel
+	stopCh := make(chan struct{})
+	finishCh := make(chan struct{})
+
+	// Start a dedicated decoder
+	r.goFunc(func() { r.pipelineDecode(s, pipeline, stopCh, finishCh) })
+
+	// Start pipeline sends at the last good nextIndex
+	nextIndex := atomic.LoadUint64(&s.nextIndex)
+
+	shouldStop := false
+SEND:
+	for !shouldStop {
+		select {
+		case <-finishCh:
+			break SEND
+		case maxIndex := <-s.stopCh:
+			// Make a best effort to replicate up to this index
+			if maxIndex > 0 {
+				r.pipelineSend(s, pipeline, &nextIndex, maxIndex)
+			}
+			break SEND
+		case deferErr := <-s.triggerDeferErrorCh:
+			lastLogIdx, _ := r.getLastLog()
+			shouldStop = r.pipelineSend(s, pipeline, &nextIndex, lastLogIdx)
+			if !shouldStop {
+				deferErr.respond(nil)
+			} else {
+				deferErr.respond(fmt.Errorf("replication failed"))
+			}
+		case <-s.triggerCh:
+			lastLogIdx, _ := r.getLastLog()
+			shouldStop = r.pipelineSend(s, pipeline, &nextIndex, lastLogIdx)
+		case <-randomTimeout(r.conf.CommitTimeout):
+			lastLogIdx, _ := r.getLastLog()
+			shouldStop = r.pipelineSend(s, pipeline, &nextIndex, lastLogIdx)
+		}
+	}
+
+	// Stop our decoder, and wait for it to finish
+	close(stopCh)
+	select {
+	case <-finishCh:
+	case <-r.shutdownCh:
+	}
+	return nil
+}
