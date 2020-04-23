@@ -453,3 +453,26 @@ SEND:
 	}
 	return nil
 }
+
+// pipelineSend is used to send data over a pipeline. It is a helper to
+// pipelineReplicate.
+func (r *Raft) pipelineSend(s *followerReplication, p AppendPipeline, nextIdx *uint64, lastIndex uint64) (shouldStop bool) {
+	// Create a new append request
+	req := new(AppendEntriesRequest)
+	if err := r.setupAppendEntries(s, req, *nextIdx, lastIndex); err != nil {
+		return true
+	}
+
+	// Pipeline the append entries
+	if _, err := p.AppendEntries(req, new(AppendEntriesResponse)); err != nil {
+		r.logger.Error("failed to pipeline appendEntries", "peer", s.peer, "error", err)
+		return true
+	}
+
+	// Increase the next send log to avoid re-sending old logs
+	if n := len(req.Entries); n > 0 {
+		last := req.Entries[n-1]
+		atomic.StoreUint64(nextIdx, last.Index+1)
+	}
+	return false
+}
