@@ -508,3 +508,18 @@ func (r *Raft) pipelineDecode(s *followerReplication, p AppendPipeline, stopCh, 
 		}
 	}
 }
+
+// setupAppendEntries is used to setup an append entries request.
+func (r *Raft) setupAppendEntries(s *followerReplication, req *AppendEntriesRequest, nextIndex, lastIndex uint64) error {
+	req.RPCHeader = r.getRPCHeader()
+	req.Term = s.currentTerm
+	req.Leader = r.trans.EncodePeer(r.localID, r.localAddr)
+	req.LeaderCommitIndex = r.getCommitIndex()
+	if err := r.setPreviousLog(req, nextIndex); err != nil {
+		return err
+	}
+	if err := r.setNewLogs(req, nextIndex, lastIndex); err != nil {
+		return err
+	}
+	return nil
+}
