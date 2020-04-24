@@ -476,3 +476,35 @@ func (r *Raft) pipelineSend(s *followerReplication, p AppendPipeline, nextIdx *u
 	}
 	return false
 }
+
+// pipelineDecode is used to decode the responses of pipelined requests.
+func (r *Raft) pipelineDecode(s *followerReplication, p AppendPipeline, stopCh, finishCh chan struct{}) {
+	defer close(finishCh)
+	respCh := p.Consumer()
+	for {
+		select {
+		case ready := <-respCh:
+			req, resp := ready.Request(), ready.Response()
+			appendStats(string(s.peer.ID), ready.Start(), float32(len(req.Entries)))
+
+			// Check for a newer term, stop running
+			if resp.Term > req.Term {
+				r.handleStaleTerm(s)
+				return
+			}
+
+			// Update the last contact
+			s.setLastContact()
+
+			// Abort pipeline if not successful
+			if !resp.Success {
+				return
+			}
+
+			// Update our replication state
+			updateLastAppended(s, req)
+		case <-stopCh:
+			return
+		}
+	}
+}
