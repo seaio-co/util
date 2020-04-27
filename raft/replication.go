@@ -551,3 +551,19 @@ func (r *Raft) setPreviousLog(req *AppendEntriesRequest, nextIndex uint64) error
 	}
 	return nil
 }
+
+// setNewLogs is used to setup the logs which should be appended for a request.
+func (r *Raft) setNewLogs(req *AppendEntriesRequest, nextIndex, lastIndex uint64) error {
+	// Append up to MaxAppendEntries or up to the lastIndex
+	req.Entries = make([]*Log, 0, r.conf.MaxAppendEntries)
+	maxIndex := min(nextIndex+uint64(r.conf.MaxAppendEntries)-1, lastIndex)
+	for i := nextIndex; i <= maxIndex; i++ {
+		oldLog := new(Log)
+		if err := r.logs.GetLog(i, oldLog); err != nil {
+			r.logger.Error("failed to get log", "index", i, "error", err)
+			return err
+		}
+		req.Entries = append(req.Entries, oldLog)
+	}
+	return nil
+}
