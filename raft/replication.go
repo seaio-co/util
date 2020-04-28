@@ -580,3 +580,18 @@ func (r *Raft) handleStaleTerm(s *followerReplication) {
 	s.notifyAll(false) // No longer leader
 	asyncNotifyCh(s.stepDown)
 }
+
+// updateLastAppended is used to update follower replication state after a
+// successful AppendEntries RPC.
+// TODO: This isn't used during InstallSnapshot, but the code there is similar.
+func updateLastAppended(s *followerReplication, req *AppendEntriesRequest) {
+	// Mark any inflight logs as committed
+	if logs := req.Entries; len(logs) > 0 {
+		last := logs[len(logs)-1]
+		atomic.StoreUint64(&s.nextIndex, last.Index+1)
+		s.commitment.match(s.peer.ID, last.Index)
+	}
+
+	// Notify still leader
+	s.notifyAll(true)
+}
