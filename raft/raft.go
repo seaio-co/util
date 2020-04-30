@@ -1,6 +1,7 @@
 package raft
 
 import (
+	"container/list"
 	"fmt"
 	"time"
 )
@@ -52,4 +53,30 @@ func (r *Raft) checkRPCHeader(rpc RPC) error {
 	}
 
 	return nil
+}
+
+// getSnapshotVersion returns the snapshot version that should be used when
+// creating snapshots, given the protocol version in use.
+func getSnapshotVersion(protocolVersion ProtocolVersion) SnapshotVersion {
+	// Right now we only have two versions and they are backwards compatible
+	// so we don't need to look at the protocol version.
+	return 1
+}
+
+// commitTuple is used to send an index that was committed,
+// with an optional associated future that should be invoked.
+type commitTuple struct {
+	log    *Log
+	future *logFuture
+}
+
+// leaderState is state that is used while we are a leader.
+type leaderState struct {
+	leadershipTransferInProgress int32 // indicates that a leadership transfer is in progress.
+	commitCh                     chan struct{}
+	commitment                   *commitment
+	inflight                     *list.List // list of logFuture in log index order
+	replState                    map[ServerID]*followerReplication
+	notify                       map[*verifyFuture]struct{}
+	stepDown                     chan struct{}
 }
