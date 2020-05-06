@@ -91,3 +91,25 @@ func (r *Raft) setLeader(leader ServerAddress) {
 		r.observe(LeaderObservation{Leader: leader})
 	}
 }
+
+// requestConfigChange is a helper for the above functions that make
+// configuration change requests. 'req' describes the change. For timeout,
+// see AddVoter.
+func (r *Raft) requestConfigChange(req configurationChangeRequest, timeout time.Duration) IndexFuture {
+	var timer <-chan time.Time
+	if timeout > 0 {
+		timer = time.After(timeout)
+	}
+	future := &configurationChangeFuture{
+		req: req,
+	}
+	future.init()
+	select {
+	case <-timer:
+		return errorFuture{ErrEnqueueTimeout}
+	case r.configurationChangeCh <- future:
+		return future
+	case <-r.shutdownCh:
+		return errorFuture{ErrRaftShutdown}
+	}
+}
