@@ -113,3 +113,27 @@ func (r *Raft) requestConfigChange(req configurationChangeRequest, timeout time.
 		return errorFuture{ErrRaftShutdown}
 	}
 }
+
+// run is a long running goroutine that runs the Raft FSM.
+func (r *Raft) run() {
+	for {
+		// Check if we are doing a shutdown
+		select {
+		case <-r.shutdownCh:
+			// Clear the leader to prevent forwarding
+			r.setLeader("")
+			return
+		default:
+		}
+
+		// Enter into a sub-FSM
+		switch r.getState() {
+		case Follower:
+			r.runFollower()
+		case Candidate:
+			r.runCandidate()
+		case Leader:
+			r.runLeader()
+		}
+	}
+}
