@@ -214,3 +214,25 @@ func (r *Raft) runFollower() {
 		}
 	}
 }
+
+// liveBootstrap attempts to seed an initial configuration for the cluster. See
+// the Raft object's member BootstrapCluster for more details. This must only be
+// called on the main thread, and only makes sense in the follower state.
+func (r *Raft) liveBootstrap(configuration Configuration) error {
+	// Use the pre-init API to make the static updates.
+	err := BootstrapCluster(&r.conf, r.logs, r.stable, r.snapshots,
+		r.trans, configuration)
+	if err != nil {
+		return err
+	}
+
+	// Make the configuration live.
+	var entry Log
+	if err := r.logs.GetLog(1, &entry); err != nil {
+		panic(err)
+	}
+	r.setCurrentTerm(1)
+	r.setLastLog(entry.Index, entry.Term)
+	r.processConfigurationLogEntry(&entry)
+	return nil
+}
