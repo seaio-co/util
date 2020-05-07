@@ -137,3 +137,80 @@ func (r *Raft) run() {
 		}
 	}
 }
+
+// runFollower runs the FSM for a follower.
+func (r *Raft) runFollower() {
+	didWarn := false
+	r.logger.Info("entering follower state", "follower", r, "leader", r.Leader())
+	metrics.IncrCounter([]string{"raft", "state", "follower"}, 1)
+	heartbeatTimer := randomTimeout(r.conf.HeartbeatTimeout)
+
+	for r.getState() == Follower {
+		select {
+		case rpc := <-r.rpcCh:
+			r.processRPC(rpc)
+
+		case c := <-r.configurationChangeCh:
+			// Reject any operations since we are not the leader
+			c.respond(ErrNotLeader)
+
+		case a := <-r.applyCh:
+			// Reject any operations since we are not the leader
+			a.respond(ErrNotLeader)
+
+		case v := <-r.verifyCh:
+			// Reject any operations since we are not the leader
+			v.respond(ErrNotLeader)
+
+		case r := <-r.userRestoreCh:
+			// Reject any restores since we are not the leader
+			r.respond(ErrNotLeader)
+
+		case r := <-r.leadershipTransferCh:
+			// Reject any operations since we are not the leader
+			r.respond(ErrNotLeader)
+
+		case c := <-r.configurationsCh:
+			c.configurations = r.configurations.Clone()
+			c.respond(nil)
+
+		case b := <-r.bootstrapCh:
+			b.respond(r.liveBootstrap(b.configuration))
+
+		case <-heartbeatTimer:
+			// Restart the heartbeat timer
+			heartbeatTimer = randomTimeout(r.conf.HeartbeatTimeout)
+
+			// Check if we have had a successful contact
+			lastContact := r.LastContact()
+			if time.Now().Sub(lastContact) < r.conf.HeartbeatTimeout {
+				continue
+			}
+
+			// Heartbeat failed! Transition to the candidate state
+			lastLeader := r.Leader()
+			r.setLeader("")
+
+			if r.configurations.latestIndex == 0 {
+				if !didWarn {
+					r.logger.Warn("no known peers, aborting election")
+					didWarn = true
+				}
+			} else if r.configurations.latestIndex == r.configurations.committedIndex &&
+				!hasVote(r.configurations.latest, r.localID) {
+				if !didWarn {
+					r.logger.Warn("not part of stable configuration, aborting election")
+					didWarn = true
+				}
+			} else {
+				r.logger.Warn("heartbeat timeout reached, starting election", "last-leader", lastLeader)
+				metrics.IncrCounter([]string{"raft", "transition", "heartbeat_timeout"}, 1)
+				r.setState(Candidate)
+				return
+			}
+
+		case <-r.shutdownCh:
+			return
+		}
+	}
+}
