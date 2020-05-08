@@ -3,6 +3,7 @@ package raft
 import (
 	"container/list"
 	"fmt"
+	"sync/atomic"
 	"time"
 )
 
@@ -319,5 +320,13 @@ func (r *Raft) runCandidate() {
 		case <-r.shutdownCh:
 			return
 		}
+	}
+}
+
+func (r *Raft) setLeadershipTransferInProgress(v bool) {
+	if v {
+		atomic.StoreInt32(&r.leaderState.leadershipTransferInProgress, 1)
+	} else {
+		atomic.StoreInt32(&r.leaderState.leadershipTransferInProgress, 0)
 	}
 }
