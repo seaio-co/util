@@ -236,3 +236,88 @@ func (r *Raft) liveBootstrap(configuration Configuration) error {
 	r.processConfigurationLogEntry(&entry)
 	return nil
 }
+
+// runCandidate runs the FSM for a candidate.
+func (r *Raft) runCandidate() {
+	r.logger.Info("entering candidate state", "node", r, "term", r.getCurrentTerm()+1)
+	metrics.IncrCounter([]string{"raft", "state", "candidate"}, 1)
+
+	// Start vote for us, and set a timeout
+	voteCh := r.electSelf()
+
+	// Make sure the leadership transfer flag is reset after each run. Having this
+	// flag will set the field LeadershipTransfer in a RequestVoteRequst to true,
+	// which will make other servers vote even though they have a leader already.
+	// It is important to reset that flag, because this priviledge could be abused
+	// otherwise.
+	defer func() { r.candidateFromLeadershipTransfer = false }()
+
+	electionTimer := randomTimeout(r.conf.ElectionTimeout)
+
+	// Tally the votes, need a simple majority
+	grantedVotes := 0
+	votesNeeded := r.quorumSize()
+	r.logger.Debug("votes", "needed", votesNeeded)
+
+	for r.getState() == Candidate {
+		select {
+		case rpc := <-r.rpcCh:
+			r.processRPC(rpc)
+
+		case vote := <-voteCh:
+			// Check if the term is greater than ours, bail
+			if vote.Term > r.getCurrentTerm() {
+				r.logger.Debug("newer term discovered, fallback to follower")
+				r.setState(Follower)
+				r.setCurrentTerm(vote.Term)
+				return
+			}
+
+			// Check if the vote is granted
+			if vote.Granted {
+				grantedVotes++
+				r.logger.Debug("vote granted", "from", vote.voterID, "term", vote.Term, "tally", grantedVotes)
+			}
+
+			// Check if we've become the leader
+			if grantedVotes >= votesNeeded {
+				r.logger.Info("election won", "tally", grantedVotes)
+				r.setState(Leader)
+				r.setLeader(r.localAddr)
+				return
+			}
+
+		case c := <-r.configurationChangeCh:
+			// Reject any operations since we are not the leader
+			c.respond(ErrNotLeader)
+
+		case a := <-r.applyCh:
+			// Reject any operations since we are not the leader
+			a.respond(ErrNotLeader)
+
+		case v := <-r.verifyCh:
+			// Reject any operations since we are not the leader
+			v.respond(ErrNotLeader)
+
+		case r := <-r.userRestoreCh:
+			// Reject any restores since we are not the leader
+			r.respond(ErrNotLeader)
+
+		case c := <-r.configurationsCh:
+			c.configurations = r.configurations.Clone()
+			c.respond(nil)
+
+		case b := <-r.bootstrapCh:
+			b.respond(ErrCantBootstrap)
+
+		case <-electionTimer:
+			// Election failed! Restart the election. We simply return,
+			// which will kick us back into runCandidate
+			r.logger.Warn("Election timeout reached, restarting election")
+			return
+
+		case <-r.shutdownCh:
+			return
+		}
+	}
+}
