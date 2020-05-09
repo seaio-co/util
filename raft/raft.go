@@ -338,3 +338,14 @@ func (r *Raft) getLeadershipTransferInProgress() bool {
 	}
 	return false
 }
+
+func (r *Raft) setupLeaderState() {
+	r.leaderState.commitCh = make(chan struct{}, 1)
+	r.leaderState.commitment = newCommitment(r.leaderState.commitCh,
+		r.configurations.latest,
+		r.getLastIndex()+1 /* first index that may be committed in this term */)
+	r.leaderState.inflight = list.New()
+	r.leaderState.replState = make(map[ServerID]*followerReplication)
+	r.leaderState.notify = make(map[*verifyFuture]struct{})
+	r.leaderState.stepDown = make(chan struct{}, 1)
+}
