@@ -349,3 +349,102 @@ func (r *Raft) setupLeaderState() {
 	r.leaderState.notify = make(map[*verifyFuture]struct{})
 	r.leaderState.stepDown = make(chan struct{}, 1)
 }
+
+// runLeader runs the FSM for a leader. Do the setup here and drop into
+// the leaderLoop for the hot loop.
+func (r *Raft) runLeader() {
+	r.logger.Info("entering leader state", "leader", r)
+	metrics.IncrCounter([]string{"raft", "state", "leader"}, 1)
+
+	// Notify that we are the leader
+	overrideNotifyBool(r.leaderCh, true)
+
+	// Push to the notify channel if given
+	if notify := r.conf.NotifyCh; notify != nil {
+		select {
+		case notify <- true:
+		case <-r.shutdownCh:
+		}
+	}
+
+	// setup leader state. This is only supposed to be accessed within the
+	// leaderloop.
+	r.setupLeaderState()
+
+	// Cleanup state on step down
+	defer func() {
+		// Since we were the leader previously, we update our
+		// last contact time when we step down, so that we are not
+		// reporting a last contact time from before we were the
+		// leader. Otherwise, to a client it would seem our data
+		// is extremely stale.
+		r.setLastContact()
+
+		// Stop replication
+		for _, p := range r.leaderState.replState {
+			close(p.stopCh)
+		}
+
+		// Respond to all inflight operations
+		for e := r.leaderState.inflight.Front(); e != nil; e = e.Next() {
+			e.Value.(*logFuture).respond(ErrLeadershipLost)
+		}
+
+		// Respond to any pending verify requests
+		for future := range r.leaderState.notify {
+			future.respond(ErrLeadershipLost)
+		}
+
+		// Clear all the state
+		r.leaderState.commitCh = nil
+		r.leaderState.commitment = nil
+		r.leaderState.inflight = nil
+		r.leaderState.replState = nil
+		r.leaderState.notify = nil
+		r.leaderState.stepDown = nil
+
+		// If we are stepping down for some reason, no known leader.
+		// We may have stepped down due to an RPC call, which would
+		// provide the leader, so we cannot always blank this out.
+		r.leaderLock.Lock()
+		if r.leader == r.localAddr {
+			r.leader = ""
+		}
+		r.leaderLock.Unlock()
+
+		// Notify that we are not the leader
+		overrideNotifyBool(r.leaderCh, false)
+
+		// Push to the notify channel if given
+		if notify := r.conf.NotifyCh; notify != nil {
+			select {
+			case notify <- false:
+			case <-r.shutdownCh:
+				// On shutdown, make a best effort but do not block
+				select {
+				case notify <- false:
+				default:
+				}
+			}
+		}
+	}()
+
+	// Start a replication routine for each peer
+	r.startStopReplication()
+
+	// Dispatch a no-op log entry first. This gets this leader up to the latest
+	// possible commit index, even in the absence of client commands. This used
+	// to append a configuration entry instead of a noop. However, that permits
+	// an unbounded number of uncommitted configurations in the log. We now
+	// maintain that there exists at most one uncommitted configuration entry in
+	// any log, so we have to do proper no-ops here.
+	noop := &logFuture{
+		log: Log{
+			Type: LogNoop,
+		},
+	}
+	r.dispatchLogs([]*logFuture{noop})
+
+	// Sit in the leader loop until we step down
+	r.leaderLoop()
+}
