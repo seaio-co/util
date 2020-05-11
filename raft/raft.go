@@ -448,3 +448,49 @@ func (r *Raft) runLeader() {
 	// Sit in the leader loop until we step down
 	r.leaderLoop()
 }
+
+func (r *Raft) startStopReplication() {
+	inConfig := make(map[ServerID]bool, len(r.configurations.latest.Servers))
+	lastIdx := r.getLastIndex()
+
+	// Start replication goroutines that need starting
+	for _, server := range r.configurations.latest.Servers {
+		if server.ID == r.localID {
+			continue
+		}
+		inConfig[server.ID] = true
+		if _, ok := r.leaderState.replState[server.ID]; !ok {
+			r.logger.Info("added peer, starting replication", "peer", server.ID)
+			s := &followerReplication{
+				peer:                server,
+				commitment:          r.leaderState.commitment,
+				stopCh:              make(chan uint64, 1),
+				triggerCh:           make(chan struct{}, 1),
+				triggerDeferErrorCh: make(chan *deferError, 1),
+				currentTerm:         r.getCurrentTerm(),
+				nextIndex:           lastIdx + 1,
+				lastContact:         time.Now(),
+				notify:              make(map[*verifyFuture]struct{}),
+				notifyCh:            make(chan struct{}, 1),
+				stepDown:            r.leaderState.stepDown,
+			}
+			r.leaderState.replState[server.ID] = s
+			r.goFunc(func() { r.replicate(s) })
+			asyncNotifyCh(s.triggerCh)
+			r.observe(PeerObservation{Peer: server, Removed: false})
+		}
+	}
+
+	// Stop replication goroutines that need stopping
+	for serverID, repl := range r.leaderState.replState {
+		if inConfig[serverID] {
+			continue
+		}
+		// Replicate up to lastIdx and stop
+		r.logger.Info("removed peer, stopping replication", "peer", serverID, "last-index", lastIdx)
+		repl.stopCh <- lastIdx
+		close(repl.stopCh)
+		delete(r.leaderState.replState, serverID)
+		r.observe(PeerObservation{Peer: repl.peer, Removed: true})
+	}
+}
