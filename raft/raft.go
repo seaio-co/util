@@ -512,3 +512,255 @@ func (r *Raft) configurationChangeChIfStable() chan *configurationChangeFuture {
 	}
 	return nil
 }
+
+// leaderLoop is the hot loop for a leader. It is invoked
+// after all the various leader setup is done.
+func (r *Raft) leaderLoop() {
+	// stepDown is used to track if there is an inflight log that
+	// would cause us to lose leadership (specifically a RemovePeer of
+	// ourselves). If this is the case, we must not allow any logs to
+	// be processed in parallel, otherwise we are basing commit on
+	// only a single peer (ourself) and replicating to an undefined set
+	// of peers.
+	stepDown := false
+	lease := time.After(r.conf.LeaderLeaseTimeout)
+
+	for r.getState() == Leader {
+		select {
+		case rpc := <-r.rpcCh:
+			r.processRPC(rpc)
+
+		case <-r.leaderState.stepDown:
+			r.setState(Follower)
+
+		case future := <-r.leadershipTransferCh:
+			if r.getLeadershipTransferInProgress() {
+				r.logger.Debug(ErrLeadershipTransferInProgress.Error())
+				future.respond(ErrLeadershipTransferInProgress)
+				continue
+			}
+
+			r.logger.Debug("starting leadership transfer", "id", future.ID, "address", future.Address)
+
+			// When we are leaving leaderLoop, we are no longer
+			// leader, so we should stop transferring.
+			leftLeaderLoop := make(chan struct{})
+			defer func() { close(leftLeaderLoop) }()
+
+			stopCh := make(chan struct{})
+			doneCh := make(chan error, 1)
+
+			// This is intentionally being setup outside of the
+			// leadershipTransfer function. Because the TimeoutNow
+			// call is blocking and there is no way to abort that
+			// in case eg the timer expires.
+			// The leadershipTransfer function is controlled with
+			// the stopCh and doneCh.
+			go func() {
+				select {
+				case <-time.After(r.conf.ElectionTimeout):
+					close(stopCh)
+					err := fmt.Errorf("leadership transfer timeout")
+					r.logger.Debug(err.Error())
+					future.respond(err)
+					<-doneCh
+				case <-leftLeaderLoop:
+					close(stopCh)
+					err := fmt.Errorf("lost leadership during transfer (expected)")
+					r.logger.Debug(err.Error())
+					future.respond(nil)
+					<-doneCh
+				case err := <-doneCh:
+					if err != nil {
+						r.logger.Debug(err.Error())
+					}
+					future.respond(err)
+				}
+			}()
+
+			// leaderState.replState is accessed here before
+			// starting leadership transfer asynchronously because
+			// leaderState is only supposed to be accessed in the
+			// leaderloop.
+			id := future.ID
+			address := future.Address
+			if id == nil {
+				s := r.pickServer()
+				if s != nil {
+					id = &s.ID
+					address = &s.Address
+				} else {
+					doneCh <- fmt.Errorf("cannot find peer")
+					continue
+				}
+			}
+			state, ok := r.leaderState.replState[*id]
+			if !ok {
+				doneCh <- fmt.Errorf("cannot find replication state for %v", id)
+				continue
+			}
+
+			go r.leadershipTransfer(*id, *address, state, stopCh, doneCh)
+
+		case <-r.leaderState.commitCh:
+			// Process the newly committed entries
+			oldCommitIndex := r.getCommitIndex()
+			commitIndex := r.leaderState.commitment.getCommitIndex()
+			r.setCommitIndex(commitIndex)
+
+			// New configration has been committed, set it as the committed
+			// value.
+			if r.configurations.latestIndex > oldCommitIndex &&
+				r.configurations.latestIndex <= commitIndex {
+				r.setCommittedConfiguration(r.configurations.latest, r.configurations.latestIndex)
+				if !hasVote(r.configurations.committed, r.localID) {
+					stepDown = true
+				}
+			}
+
+			start := time.Now()
+			var groupReady []*list.Element
+			var groupFutures = make(map[uint64]*logFuture)
+			var lastIdxInGroup uint64
+
+			// Pull all inflight logs that are committed off the queue.
+			for e := r.leaderState.inflight.Front(); e != nil; e = e.Next() {
+				commitLog := e.Value.(*logFuture)
+				idx := commitLog.log.Index
+				if idx > commitIndex {
+					// Don't go past the committed index
+					break
+				}
+
+				// Measure the commit time
+				metrics.MeasureSince([]string{"raft", "commitTime"}, commitLog.dispatch)
+				groupReady = append(groupReady, e)
+				groupFutures[idx] = commitLog
+				lastIdxInGroup = idx
+			}
+
+			// Process the group
+			if len(groupReady) != 0 {
+				r.processLogs(lastIdxInGroup, groupFutures)
+
+				for _, e := range groupReady {
+					r.leaderState.inflight.Remove(e)
+				}
+			}
+
+			// Measure the time to enqueue batch of logs for FSM to apply
+			metrics.MeasureSince([]string{"raft", "fsm", "enqueue"}, start)
+
+			// Count the number of logs enqueued
+			metrics.SetGauge([]string{"raft", "commitNumLogs"}, float32(len(groupReady)))
+
+			if stepDown {
+				if r.conf.ShutdownOnRemove {
+					r.logger.Info("removed ourself, shutting down")
+					r.Shutdown()
+				} else {
+					r.logger.Info("removed ourself, transitioning to follower")
+					r.setState(Follower)
+				}
+			}
+
+		case v := <-r.verifyCh:
+			if v.quorumSize == 0 {
+				// Just dispatched, start the verification
+				r.verifyLeader(v)
+
+			} else if v.votes < v.quorumSize {
+				// Early return, means there must be a new leader
+				r.logger.Warn("new leader elected, stepping down")
+				r.setState(Follower)
+				delete(r.leaderState.notify, v)
+				for _, repl := range r.leaderState.replState {
+					repl.cleanNotify(v)
+				}
+				v.respond(ErrNotLeader)
+
+			} else {
+				// Quorum of members agree, we are still leader
+				delete(r.leaderState.notify, v)
+				for _, repl := range r.leaderState.replState {
+					repl.cleanNotify(v)
+				}
+				v.respond(nil)
+			}
+
+		case future := <-r.userRestoreCh:
+			if r.getLeadershipTransferInProgress() {
+				r.logger.Debug(ErrLeadershipTransferInProgress.Error())
+				future.respond(ErrLeadershipTransferInProgress)
+				continue
+			}
+			err := r.restoreUserSnapshot(future.meta, future.reader)
+			future.respond(err)
+
+		case future := <-r.configurationsCh:
+			if r.getLeadershipTransferInProgress() {
+				r.logger.Debug(ErrLeadershipTransferInProgress.Error())
+				future.respond(ErrLeadershipTransferInProgress)
+				continue
+			}
+			future.configurations = r.configurations.Clone()
+			future.respond(nil)
+
+		case future := <-r.configurationChangeChIfStable():
+			if r.getLeadershipTransferInProgress() {
+				r.logger.Debug(ErrLeadershipTransferInProgress.Error())
+				future.respond(ErrLeadershipTransferInProgress)
+				continue
+			}
+			r.appendConfigurationEntry(future)
+
+		case b := <-r.bootstrapCh:
+			b.respond(ErrCantBootstrap)
+
+		case newLog := <-r.applyCh:
+			if r.getLeadershipTransferInProgress() {
+				r.logger.Debug(ErrLeadershipTransferInProgress.Error())
+				newLog.respond(ErrLeadershipTransferInProgress)
+				continue
+			}
+			// Group commit, gather all the ready commits
+			ready := []*logFuture{newLog}
+		GROUP_COMMIT_LOOP:
+			for i := 0; i < r.conf.MaxAppendEntries; i++ {
+				select {
+				case newLog := <-r.applyCh:
+					ready = append(ready, newLog)
+				default:
+					break GROUP_COMMIT_LOOP
+				}
+			}
+
+			// Dispatch the logs
+			if stepDown {
+				// we're in the process of stepping down as leader, don't process anything new
+				for i := range ready {
+					ready[i].respond(ErrNotLeader)
+				}
+			} else {
+				r.dispatchLogs(ready)
+			}
+
+		case <-lease:
+			// Check if we've exceeded the lease, potentially stepping down
+			maxDiff := r.checkLeaderLease()
+
+			// Next check interval should adjust for the last node we've
+			// contacted, without going negative
+			checkInterval := r.conf.LeaderLeaseTimeout - maxDiff
+			if checkInterval < minCheckInterval {
+				checkInterval = minCheckInterval
+			}
+
+			// Renew the lease timer
+			lease = time.After(checkInterval)
+
+		case <-r.shutdownCh:
+			return
+		}
+	}
+}
