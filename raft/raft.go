@@ -494,3 +494,21 @@ func (r *Raft) startStopReplication() {
 		r.observe(PeerObservation{Peer: repl.peer, Removed: true})
 	}
 }
+
+// configurationChangeChIfStable returns r.configurationChangeCh if it's safe
+// to process requests from it, or nil otherwise. This must only be called
+// from the main thread.
+//
+// Note that if the conditions here were to change outside of leaderLoop to take
+// this from nil to non-nil, we would need leaderLoop to be kicked.
+func (r *Raft) configurationChangeChIfStable() chan *configurationChangeFuture {
+	// Have to wait until:
+	// 1. The latest configuration is committed, and
+	// 2. This leader has committed some entry (the noop) in this term
+	//    https://groups.google.com/forum/#!msg/raft-dev/t4xj6dJTP6E/d2D9LrWRza8J
+	if r.configurations.latestIndex == r.configurations.committedIndex &&
+		r.getCommitIndex() >= r.leaderState.commitment.startIndex {
+		return r.configurationChangeCh
+	}
+	return nil
+}
