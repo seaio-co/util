@@ -764,3 +764,29 @@ func (r *Raft) leaderLoop() {
 		}
 	}
 }
+
+// verifyLeader must be called from the main thread for safety.
+// Causes the followers to attempt an immediate heartbeat.
+func (r *Raft) verifyLeader(v *verifyFuture) {
+	// Current leader always votes for self
+	v.votes = 1
+
+	// Set the quorum size, hot-path for single node
+	v.quorumSize = r.quorumSize()
+	if v.quorumSize == 1 {
+		v.respond(nil)
+		return
+	}
+
+	// Track this request
+	v.notifyCh = r.verifyCh
+	r.leaderState.notify[v] = struct{}{}
+
+	// Trigger immediate heartbeats
+	for _, repl := range r.leaderState.replState {
+		repl.notifyLock.Lock()
+		repl.notify[v] = struct{}{}
+		repl.notifyLock.Unlock()
+		asyncNotifyCh(repl.notifyCh)
+	}
+}
