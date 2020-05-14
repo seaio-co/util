@@ -790,3 +790,51 @@ func (r *Raft) verifyLeader(v *verifyFuture) {
 		asyncNotifyCh(repl.notifyCh)
 	}
 }
+
+// leadershipTransfer is doing the heavy lifting for the leadership transfer.
+func (r *Raft) leadershipTransfer(id ServerID, address ServerAddress, repl *followerReplication, stopCh chan struct{}, doneCh chan error) {
+
+	// make sure we are not already stopped
+	select {
+	case <-stopCh:
+		doneCh <- nil
+		return
+	default:
+	}
+
+	// Step 1: set this field which stops this leader from responding to any client requests.
+	r.setLeadershipTransferInProgress(true)
+	defer func() { r.setLeadershipTransferInProgress(false) }()
+
+	for atomic.LoadUint64(&repl.nextIndex) <= r.getLastIndex() {
+		err := &deferError{}
+		err.init()
+		repl.triggerDeferErrorCh <- err
+		select {
+		case err := <-err.errCh:
+			if err != nil {
+				doneCh <- err
+				return
+			}
+		case <-stopCh:
+			doneCh <- nil
+			return
+		}
+	}
+
+	// Step ?: the thesis describes in chap 6.4.1: Using clocks to reduce
+	// messaging for read-only queries. If this is implemented, the lease
+	// has to be reset as well, in case leadership is transferred. This
+	// implementation also has a lease, but it serves another purpose and
+	// doesn't need to be reset. The lease mechanism in our raft lib, is
+	// setup in a similar way to the one in the thesis, but in practice
+	// it's a timer that just tells the leader how often to check
+	// heartbeats are still coming in.
+
+	// Step 3: send TimeoutNow message to target server.
+	err := r.trans.TimeoutNow(id, address, &TimeoutNowRequest{RPCHeader: r.getRPCHeader()}, &TimeoutNowResponse{})
+	if err != nil {
+		err = fmt.Errorf("failed to make TimeoutNow RPC to %v: %v", id, err)
+	}
+	doneCh <- err
+}
