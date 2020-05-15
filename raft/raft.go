@@ -884,3 +884,16 @@ func (r *Raft) checkLeaderLease() time.Duration {
 	}
 	return maxDiff
 }
+
+// quorumSize is used to return the quorum size. This must only be called on
+// the main thread.
+// TODO: revisit usage
+func (r *Raft) quorumSize() int {
+	voters := 0
+	for _, server := range r.configurations.latest.Servers {
+		if server.Suffrage == Voter {
+			voters++
+		}
+	}
+	return voters/2 + 1
+}
