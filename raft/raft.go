@@ -838,3 +838,49 @@ func (r *Raft) leadershipTransfer(id ServerID, address ServerAddress, repl *foll
 	}
 	doneCh <- err
 }
+
+// checkLeaderLease is used to check if we can contact a quorum of nodes
+// within the last leader lease interval. If not, we need to step down,
+// as we may have lost connectivity. Returns the maximum duration without
+// contact. This must only be called from the main thread.
+func (r *Raft) checkLeaderLease() time.Duration {
+	// Track contacted nodes, we can always contact ourself
+	contacted := 0
+
+	// Check each follower
+	var maxDiff time.Duration
+	now := time.Now()
+	for _, server := range r.configurations.latest.Servers {
+		if server.Suffrage == Voter {
+			if server.ID == r.localID {
+				contacted++
+				continue
+			}
+			f := r.leaderState.replState[server.ID]
+			diff := now.Sub(f.LastContact())
+			if diff <= r.conf.LeaderLeaseTimeout {
+				contacted++
+				if diff > maxDiff {
+					maxDiff = diff
+				}
+			} else {
+				// Log at least once at high value, then debug. Otherwise it gets very verbose.
+				if diff <= 3*r.conf.LeaderLeaseTimeout {
+					r.logger.Warn("failed to contact", "server-id", server.ID, "time", diff)
+				} else {
+					r.logger.Debug("failed to contact", "server-id", server.ID, "time", diff)
+				}
+			}
+			metrics.AddSample([]string{"raft", "leader", "lastContact"}, float32(diff/time.Millisecond))
+		}
+	}
+
+	// Verify we can contact a quorum
+	quorum := r.quorumSize()
+	if contacted < quorum {
+		r.logger.Warn("failed to contact quorum of nodes, stepping down")
+		r.setState(Follower)
+		metrics.IncrCounter([]string{"raft", "transition", "leader_lease_timeout"}, 1)
+	}
+	return maxDiff
+}
