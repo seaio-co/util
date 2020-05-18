@@ -987,3 +987,35 @@ func (r *Raft) restoreUserSnapshot(meta *SnapshotMeta, reader io.Reader) error {
 	r.logger.Info("restored user snapshot", "index", latestIndex)
 	return nil
 }
+
+func (r *Raft) appendConfigurationEntry(future *configurationChangeFuture) {
+	configuration, err := nextConfiguration(r.configurations.latest, r.configurations.latestIndex, future.req)
+	if err != nil {
+		future.respond(err)
+		return
+	}
+
+	r.logger.Info("updating configuration",
+		"command", future.req.command,
+		"server-id", future.req.serverID,
+		"server-addr", future.req.serverAddress,
+		"servers", hclog.Fmt("%+v", configuration.Servers))
+
+	if r.protocolVersion < 2 {
+		future.log = Log{
+			Type: LogRemovePeerDeprecated,
+			Data: encodePeers(configuration, r.trans),
+		}
+	} else {
+		future.log = Log{
+			Type: LogConfiguration,
+			Data: EncodeConfiguration(configuration),
+		}
+	}
+
+	r.dispatchLogs([]*logFuture{&future.logFuture})
+	index := future.Index()
+	r.setLatestConfiguration(configuration, index)
+	r.leaderState.commitment.setConfiguration(configuration)
+	r.startStopReplication()
+}
