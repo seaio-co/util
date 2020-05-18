@@ -3,6 +3,7 @@ package raft
 import (
 	"container/list"
 	"fmt"
+	"io"
 	"sync/atomic"
 	"time"
 )
@@ -896,4 +897,93 @@ func (r *Raft) quorumSize() int {
 		}
 	}
 	return voters/2 + 1
+}
+
+func (r *Raft) restoreUserSnapshot(meta *SnapshotMeta, reader io.Reader) error {
+	defer metrics.MeasureSince([]string{"raft", "restoreUserSnapshot"}, time.Now())
+
+	// Sanity check the version.
+	version := meta.Version
+	if version < SnapshotVersionMin || version > SnapshotVersionMax {
+		return fmt.Errorf("unsupported snapshot version %d", version)
+	}
+
+	// We don't support snapshots while there's a config change
+	// outstanding since the snapshot doesn't have a means to
+	// represent this state.
+	committedIndex := r.configurations.committedIndex
+	latestIndex := r.configurations.latestIndex
+	if committedIndex != latestIndex {
+		return fmt.Errorf("cannot restore snapshot now, wait until the configuration entry at %v has been applied (have applied %v)",
+			latestIndex, committedIndex)
+	}
+
+	// Cancel any inflight requests.
+	for {
+		e := r.leaderState.inflight.Front()
+		if e == nil {
+			break
+		}
+		e.Value.(*logFuture).respond(ErrAbortedByRestore)
+		r.leaderState.inflight.Remove(e)
+	}
+
+	// We will overwrite the snapshot metadata with the current term,
+	// an index that's greater than the current index, or the last
+	// index in the snapshot. It's important that we leave a hole in
+	// the index so we know there's nothing in the Raft log there and
+	// replication will fault and send the snapshot.
+	term := r.getCurrentTerm()
+	lastIndex := r.getLastIndex()
+	if meta.Index > lastIndex {
+		lastIndex = meta.Index
+	}
+	lastIndex++
+
+	// Dump the snapshot. Note that we use the latest configuration,
+	// not the one that came with the snapshot.
+	sink, err := r.snapshots.Create(version, lastIndex, term,
+		r.configurations.latest, r.configurations.latestIndex, r.trans)
+	if err != nil {
+		return fmt.Errorf("failed to create snapshot: %v", err)
+	}
+	n, err := io.Copy(sink, reader)
+	if err != nil {
+		sink.Cancel()
+		return fmt.Errorf("failed to write snapshot: %v", err)
+	}
+	if n != meta.Size {
+		sink.Cancel()
+		return fmt.Errorf("failed to write snapshot, size didn't match (%d != %d)", n, meta.Size)
+	}
+	if err := sink.Close(); err != nil {
+		return fmt.Errorf("failed to close snapshot: %v", err)
+	}
+	r.logger.Info("copied to local snapshot", "bytes", n)
+
+	// Restore the snapshot into the FSM. If this fails we are in a
+	// bad state so we panic to take ourselves out.
+	fsm := &restoreFuture{ID: sink.ID()}
+	fsm.ShutdownCh = r.shutdownCh
+	fsm.init()
+	select {
+	case r.fsmMutateCh <- fsm:
+	case <-r.shutdownCh:
+		return ErrRaftShutdown
+	}
+	if err := fsm.Error(); err != nil {
+		panic(fmt.Errorf("failed to restore snapshot: %v", err))
+	}
+
+	// We set the last log so it looks like we've stored the empty
+	// index we burned. The last applied is set because we made the
+	// FSM take the snapshot state, and we store the last snapshot
+	// in the stable store since we created a snapshot as part of
+	// this process.
+	r.setLastLog(lastIndex, term)
+	r.setLastApplied(lastIndex)
+	r.setLastSnapshot(lastIndex, term)
+
+	r.logger.Info("restored user snapshot", "index", latestIndex)
+	return nil
 }
