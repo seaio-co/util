@@ -1061,3 +1061,68 @@ func (r *Raft) dispatchLogs(applyLogs []*logFuture) {
 		asyncNotifyCh(f.triggerCh)
 	}
 }
+
+func (r *Raft) processLogs(index uint64, futures map[uint64]*logFuture) {
+	// Reject logs we've applied already
+	lastApplied := r.getLastApplied()
+	if index <= lastApplied {
+		r.logger.Warn("skipping application of old log", "index", index)
+		return
+	}
+
+	applyBatch := func(batch []*commitTuple) {
+		select {
+		case r.fsmMutateCh <- batch:
+		case <-r.shutdownCh:
+			for _, cl := range batch {
+				if cl.future != nil {
+					cl.future.respond(ErrRaftShutdown)
+				}
+			}
+		}
+	}
+
+	batch := make([]*commitTuple, 0, r.conf.MaxAppendEntries)
+
+	// Apply all the preceding logs
+	for idx := lastApplied + 1; idx <= index; idx++ {
+		var preparedLog *commitTuple
+		// Get the log, either from the future or from our log store
+		future, futureOk := futures[idx]
+		if futureOk {
+			preparedLog = r.prepareLog(&future.log, future)
+		} else {
+			l := new(Log)
+			if err := r.logs.GetLog(idx, l); err != nil {
+				r.logger.Error("failed to get log", "index", idx, "error", err)
+				panic(err)
+			}
+			preparedLog = r.prepareLog(l, nil)
+		}
+
+		switch {
+		case preparedLog != nil:
+			// If we have a log ready to send to the FSM add it to the batch.
+			// The FSM thread will respond to the future.
+			batch = append(batch, preparedLog)
+
+			// If we have filled up a batch, send it to the FSM
+			if len(batch) >= r.conf.MaxAppendEntries {
+				applyBatch(batch)
+				batch = make([]*commitTuple, 0, r.conf.MaxAppendEntries)
+			}
+
+		case futureOk:
+			// Invoke the future if given.
+			future.respond(nil)
+		}
+	}
+
+	// If there are any remaining logs in the batch apply them
+	if len(batch) != 0 {
+		applyBatch(batch)
+	}
+
+	// Update the lastApplied index and term
+	r.setLastApplied(index)
+}
