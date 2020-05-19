@@ -1019,3 +1019,45 @@ func (r *Raft) appendConfigurationEntry(future *configurationChangeFuture) {
 	r.leaderState.commitment.setConfiguration(configuration)
 	r.startStopReplication()
 }
+
+// dispatchLog is called on the leader to push a log to disk, mark it
+// as inflight and begin replication of it.
+func (r *Raft) dispatchLogs(applyLogs []*logFuture) {
+	now := time.Now()
+	defer metrics.MeasureSince([]string{"raft", "leader", "dispatchLog"}, now)
+
+	term := r.getCurrentTerm()
+	lastIndex := r.getLastIndex()
+
+	n := len(applyLogs)
+	logs := make([]*Log, n)
+	metrics.SetGauge([]string{"raft", "leader", "dispatchNumLogs"}, float32(n))
+
+	for idx, applyLog := range applyLogs {
+		applyLog.dispatch = now
+		lastIndex++
+		applyLog.log.Index = lastIndex
+		applyLog.log.Term = term
+		logs[idx] = &applyLog.log
+		r.leaderState.inflight.PushBack(applyLog)
+	}
+
+	// Write the log entry locally
+	if err := r.logs.StoreLogs(logs); err != nil {
+		r.logger.Error("failed to commit logs", "error", err)
+		for _, applyLog := range applyLogs {
+			applyLog.respond(err)
+		}
+		r.setState(Follower)
+		return
+	}
+	r.leaderState.commitment.match(r.localID, lastIndex)
+
+	// Update the last log since it's on disk now
+	r.setLastLog(lastIndex, term)
+
+	// Notify the replicators of the new log
+	for _, f := range r.leaderState.replState {
+		asyncNotifyCh(f.triggerCh)
+	}
+}
