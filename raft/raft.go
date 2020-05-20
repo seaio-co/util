@@ -1126,3 +1126,30 @@ func (r *Raft) processLogs(index uint64, futures map[uint64]*logFuture) {
 	// Update the lastApplied index and term
 	r.setLastApplied(index)
 }
+
+// processLog is invoked to process the application of a single committed log entry.
+func (r *Raft) prepareLog(l *Log, future *logFuture) *commitTuple {
+	switch l.Type {
+	case LogBarrier:
+		// Barrier is handled by the FSM
+		fallthrough
+
+	case LogCommand:
+		return &commitTuple{l, future}
+
+	case LogConfiguration:
+		// Only support this with the v2 configuration format
+		if r.protocolVersion > 2 {
+			return &commitTuple{l, future}
+		}
+	case LogAddPeerDeprecated:
+	case LogRemovePeerDeprecated:
+	case LogNoop:
+		// Ignore the no-op
+
+	default:
+		panic(fmt.Errorf("unrecognized log type: %#v", l))
+	}
+
+	return nil
+}
