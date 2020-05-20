@@ -1153,3 +1153,25 @@ func (r *Raft) prepareLog(l *Log, future *logFuture) *commitTuple {
 
 	return nil
 }
+
+func (r *Raft) processRPC(rpc RPC) {
+	if err := r.checkRPCHeader(rpc); err != nil {
+		rpc.Respond(nil, err)
+		return
+	}
+
+	switch cmd := rpc.Command.(type) {
+	case *AppendEntriesRequest:
+		r.appendEntries(rpc, cmd)
+	case *RequestVoteRequest:
+		r.requestVote(rpc, cmd)
+	case *InstallSnapshotRequest:
+		r.installSnapshot(rpc, cmd)
+	case *TimeoutNowRequest:
+		r.timeoutNow(rpc, cmd)
+	default:
+		r.logger.Error("got unexpected command",
+			"command", hclog.Fmt("%#v", rpc.Command))
+		rpc.Respond(nil, fmt.Errorf("unexpected command"))
+	}
+}
