@@ -1175,3 +1175,23 @@ func (r *Raft) processRPC(rpc RPC) {
 		rpc.Respond(nil, fmt.Errorf("unexpected command"))
 	}
 }
+
+func (r *Raft) processHeartbeat(rpc RPC) {
+	defer metrics.MeasureSince([]string{"raft", "rpc", "processHeartbeat"}, time.Now())
+
+	// Check if we are shutdown, just ignore the RPC
+	select {
+	case <-r.shutdownCh:
+		return
+	default:
+	}
+
+	// Ensure we are only handling a heartbeat
+	switch cmd := rpc.Command.(type) {
+	case *AppendEntriesRequest:
+		r.appendEntries(rpc, cmd)
+	default:
+		r.logger.Error("expected heartbeat, got", "command", hclog.Fmt("%#v", rpc.Command))
+		rpc.Respond(nil, fmt.Errorf("unexpected command"))
+	}
+}
