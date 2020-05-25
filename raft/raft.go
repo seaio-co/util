@@ -1195,3 +1195,140 @@ func (r *Raft) processHeartbeat(rpc RPC) {
 		rpc.Respond(nil, fmt.Errorf("unexpected command"))
 	}
 }
+
+func (r *Raft) appendEntries(rpc RPC, a *AppendEntriesRequest) {
+	defer metrics.MeasureSince([]string{"raft", "rpc", "appendEntries"}, time.Now())
+	// Setup a response
+	resp := &AppendEntriesResponse{
+		RPCHeader:      r.getRPCHeader(),
+		Term:           r.getCurrentTerm(),
+		LastLog:        r.getLastIndex(),
+		Success:        false,
+		NoRetryBackoff: false,
+	}
+	var rpcErr error
+	defer func() {
+		rpc.Respond(resp, rpcErr)
+	}()
+
+	// Ignore an older term
+	if a.Term < r.getCurrentTerm() {
+		return
+	}
+
+	// Increase the term if we see a newer one, also transition to follower
+	// if we ever get an appendEntries call
+	if a.Term > r.getCurrentTerm() || r.getState() != Follower {
+		// Ensure transition to follower
+		r.setState(Follower)
+		r.setCurrentTerm(a.Term)
+		resp.Term = a.Term
+	}
+
+	// Save the current leader
+	r.setLeader(ServerAddress(r.trans.DecodePeer(a.Leader)))
+
+	// Verify the last log entry
+	if a.PrevLogEntry > 0 {
+		lastIdx, lastTerm := r.getLastEntry()
+
+		var prevLogTerm uint64
+		if a.PrevLogEntry == lastIdx {
+			prevLogTerm = lastTerm
+
+		} else {
+			var prevLog Log
+			if err := r.logs.GetLog(a.PrevLogEntry, &prevLog); err != nil {
+				r.logger.Warn("failed to get previous log",
+					"previous-index", a.PrevLogEntry,
+					"last-index", lastIdx,
+					"error", err)
+				resp.NoRetryBackoff = true
+				return
+			}
+			prevLogTerm = prevLog.Term
+		}
+
+		if a.PrevLogTerm != prevLogTerm {
+			r.logger.Warn("previous log term mis-match",
+				"ours", prevLogTerm,
+				"remote", a.PrevLogTerm)
+			resp.NoRetryBackoff = true
+			return
+		}
+	}
+
+	// Process any new entries
+	if len(a.Entries) > 0 {
+		start := time.Now()
+
+		// Delete any conflicting entries, skip any duplicates
+		lastLogIdx, _ := r.getLastLog()
+		var newEntries []*Log
+		for i, entry := range a.Entries {
+			if entry.Index > lastLogIdx {
+				newEntries = a.Entries[i:]
+				break
+			}
+			var storeEntry Log
+			if err := r.logs.GetLog(entry.Index, &storeEntry); err != nil {
+				r.logger.Warn("failed to get log entry",
+					"index", entry.Index,
+					"error", err)
+				return
+			}
+			if entry.Term != storeEntry.Term {
+				r.logger.Warn("clearing log suffix",
+					"from", entry.Index,
+					"to", lastLogIdx)
+				if err := r.logs.DeleteRange(entry.Index, lastLogIdx); err != nil {
+					r.logger.Error("failed to clear log suffix", "error", err)
+					return
+				}
+				if entry.Index <= r.configurations.latestIndex {
+					r.setLatestConfiguration(r.configurations.committed, r.configurations.committedIndex)
+				}
+				newEntries = a.Entries[i:]
+				break
+			}
+		}
+
+		if n := len(newEntries); n > 0 {
+			// Append the new entries
+			if err := r.logs.StoreLogs(newEntries); err != nil {
+				r.logger.Error("failed to append to logs", "error", err)
+				// TODO: leaving r.getLastLog() in the wrong
+				// state if there was a truncation above
+				return
+			}
+
+			// Handle any new configuration changes
+			for _, newEntry := range newEntries {
+				r.processConfigurationLogEntry(newEntry)
+			}
+
+			// Update the lastLog
+			last := newEntries[n-1]
+			r.setLastLog(last.Index, last.Term)
+		}
+
+		metrics.MeasureSince([]string{"raft", "rpc", "appendEntries", "storeLogs"}, start)
+	}
+
+	// Update the commit index
+	if a.LeaderCommitIndex > 0 && a.LeaderCommitIndex > r.getCommitIndex() {
+		start := time.Now()
+		idx := min(a.LeaderCommitIndex, r.getLastIndex())
+		r.setCommitIndex(idx)
+		if r.configurations.latestIndex <= idx {
+			r.setCommittedConfiguration(r.configurations.latest, r.configurations.latestIndex)
+		}
+		r.processLogs(idx, nil)
+		metrics.MeasureSince([]string{"raft", "rpc", "appendEntries", "processLogs"}, start)
+	}
+
+	// Everything went well, set success
+	resp.Success = true
+	r.setLastContact()
+	return
+}
