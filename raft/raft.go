@@ -1,6 +1,7 @@
 package raft
 
 import (
+	"bytes"
 	"container/list"
 	"fmt"
 	"io"
@@ -1341,4 +1342,102 @@ func (r *Raft) processConfigurationLogEntry(entry *Log) {
 		r.setCommittedConfiguration(r.configurations.latest, r.configurations.latestIndex)
 		r.setLatestConfiguration(decodePeers(entry.Data, r.trans), entry.Index)
 	}
+}
+
+func (r *Raft) requestVote(rpc RPC, req *RequestVoteRequest) {
+	defer metrics.MeasureSince([]string{"raft", "rpc", "requestVote"}, time.Now())
+	r.observe(*req)
+
+	// Setup a response
+	resp := &RequestVoteResponse{
+		RPCHeader: r.getRPCHeader(),
+		Term:      r.getCurrentTerm(),
+		Granted:   false,
+	}
+	var rpcErr error
+	defer func() {
+		rpc.Respond(resp, rpcErr)
+	}()
+
+	// Version 0 servers will panic unless the peers is present. It's only
+	// used on them to produce a warning message.
+	if r.protocolVersion < 2 {
+		resp.Peers = encodePeers(r.configurations.latest, r.trans)
+	}
+
+	// Check if we have an existing leader [who's not the candidate] and also
+	// check the LeadershipTransfer flag is set. Usually votes are rejected if
+	// there is a known leader. But if the leader initiated a leadership transfer,
+	// vote!
+	candidate := r.trans.DecodePeer(req.Candidate)
+	if leader := r.Leader(); leader != "" && leader != candidate && !req.LeadershipTransfer {
+		r.logger.Warn("rejecting vote request since we have a leader",
+			"from", candidate,
+			"leader", leader)
+		return
+	}
+
+	// Ignore an older term
+	if req.Term < r.getCurrentTerm() {
+		return
+	}
+
+	// Increase the term if we see a newer one
+	if req.Term > r.getCurrentTerm() {
+		// Ensure transition to follower
+		r.logger.Debug("lost leadership because received a requestVote with a newer term")
+		r.setState(Follower)
+		r.setCurrentTerm(req.Term)
+		resp.Term = req.Term
+	}
+
+	// Check if we have voted yet
+	lastVoteTerm, err := r.stable.GetUint64(keyLastVoteTerm)
+	if err != nil && err.Error() != "not found" {
+		r.logger.Error("failed to get last vote term", "error", err)
+		return
+	}
+	lastVoteCandBytes, err := r.stable.Get(keyLastVoteCand)
+	if err != nil && err.Error() != "not found" {
+		r.logger.Error("failed to get last vote candidate", "error", err)
+		return
+	}
+
+	// Check if we've voted in this election before
+	if lastVoteTerm == req.Term && lastVoteCandBytes != nil {
+		r.logger.Info("duplicate requestVote for same term", "term", req.Term)
+		if bytes.Compare(lastVoteCandBytes, req.Candidate) == 0 {
+			r.logger.Warn("duplicate requestVote from", "candidate", req.Candidate)
+			resp.Granted = true
+		}
+		return
+	}
+
+	// Reject if their term is older
+	lastIdx, lastTerm := r.getLastEntry()
+	if lastTerm > req.LastLogTerm {
+		r.logger.Warn("rejecting vote request since our last term is greater",
+			"candidate", candidate,
+			"last-term", lastTerm,
+			"last-candidate-term", req.LastLogTerm)
+		return
+	}
+
+	if lastTerm == req.LastLogTerm && lastIdx > req.LastLogIndex {
+		r.logger.Warn("rejecting vote request since our last index is greater",
+			"candidate", candidate,
+			"last-index", lastIdx,
+			"last-candidate-index", req.LastLogIndex)
+		return
+	}
+
+	// Persist a vote for safety
+	if err := r.persistVote(req.Term, req.Candidate); err != nil {
+		r.logger.Error("failed to persist vote", "error", err)
+		return
+	}
+
+	resp.Granted = true
+	r.setLastContact()
+	return
 }
