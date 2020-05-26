@@ -1332,3 +1332,13 @@ func (r *Raft) appendEntries(rpc RPC, a *AppendEntriesRequest) {
 	r.setLastContact()
 	return
 }
+
+func (r *Raft) processConfigurationLogEntry(entry *Log) {
+	if entry.Type == LogConfiguration {
+		r.setCommittedConfiguration(r.configurations.latest, r.configurations.latestIndex)
+		r.setLatestConfiguration(DecodeConfiguration(entry.Data), entry.Index)
+	} else if entry.Type == LogAddPeerDeprecated || entry.Type == LogRemovePeerDeprecated {
+		r.setCommittedConfiguration(r.configurations.latest, r.configurations.latestIndex)
+		r.setLatestConfiguration(decodePeers(entry.Data, r.trans), entry.Index)
+	}
+}
