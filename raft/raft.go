@@ -1565,3 +1565,9 @@ func (r *Raft) installSnapshot(rpc RPC, req *InstallSnapshotRequest) {
 	r.setLastContact()
 	return
 }
+
+func (r *Raft) setLastContact() {
+	r.lastContactLock.Lock()
+	r.lastContact = time.Now()
+	r.lastContactLock.Unlock()
+}
