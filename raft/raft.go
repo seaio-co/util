@@ -5,6 +5,7 @@ import (
 	"container/list"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"sync/atomic"
 	"time"
 )
@@ -1438,6 +1439,129 @@ func (r *Raft) requestVote(rpc RPC, req *RequestVoteRequest) {
 	}
 
 	resp.Granted = true
+	r.setLastContact()
+	return
+}
+
+func (r *Raft) installSnapshot(rpc RPC, req *InstallSnapshotRequest) {
+	defer metrics.MeasureSince([]string{"raft", "rpc", "installSnapshot"}, time.Now())
+	// Setup a response
+	resp := &InstallSnapshotResponse{
+		Term:    r.getCurrentTerm(),
+		Success: false,
+	}
+	var rpcErr error
+	defer func() {
+		io.Copy(ioutil.Discard, rpc.Reader) // ensure we always consume all the snapshot data from the stream [see issue #212]
+		rpc.Respond(resp, rpcErr)
+	}()
+
+	// Sanity check the version
+	if req.SnapshotVersion < SnapshotVersionMin ||
+		req.SnapshotVersion > SnapshotVersionMax {
+		rpcErr = fmt.Errorf("unsupported snapshot version %d", req.SnapshotVersion)
+		return
+	}
+
+	// Ignore an older term
+	if req.Term < r.getCurrentTerm() {
+		r.logger.Info("ignoring installSnapshot request with older term than current term",
+			"request-term", req.Term,
+			"current-term", r.getCurrentTerm())
+		return
+	}
+
+	// Increase the term if we see a newer one
+	if req.Term > r.getCurrentTerm() {
+		// Ensure transition to follower
+		r.setState(Follower)
+		r.setCurrentTerm(req.Term)
+		resp.Term = req.Term
+	}
+
+	// Save the current leader
+	r.setLeader(ServerAddress(r.trans.DecodePeer(req.Leader)))
+
+	// Create a new snapshot
+	var reqConfiguration Configuration
+	var reqConfigurationIndex uint64
+	if req.SnapshotVersion > 0 {
+		reqConfiguration = DecodeConfiguration(req.Configuration)
+		reqConfigurationIndex = req.ConfigurationIndex
+	} else {
+		reqConfiguration = decodePeers(req.Peers, r.trans)
+		reqConfigurationIndex = req.LastLogIndex
+	}
+	version := getSnapshotVersion(r.protocolVersion)
+	sink, err := r.snapshots.Create(version, req.LastLogIndex, req.LastLogTerm,
+		reqConfiguration, reqConfigurationIndex, r.trans)
+	if err != nil {
+		r.logger.Error("failed to create snapshot to install", "error", err)
+		rpcErr = fmt.Errorf("failed to create snapshot: %v", err)
+		return
+	}
+
+	// Spill the remote snapshot to disk
+	n, err := io.Copy(sink, rpc.Reader)
+	if err != nil {
+		sink.Cancel()
+		r.logger.Error("failed to copy snapshot", "error", err)
+		rpcErr = err
+		return
+	}
+
+	// Check that we received it all
+	if n != req.Size {
+		sink.Cancel()
+		r.logger.Error("failed to receive whole snapshot",
+			"received", hclog.Fmt("%d / %d", n, req.Size))
+		rpcErr = fmt.Errorf("short read")
+		return
+	}
+
+	// Finalize the snapshot
+	if err := sink.Close(); err != nil {
+		r.logger.Error("failed to finalize snapshot", "error", err)
+		rpcErr = err
+		return
+	}
+	r.logger.Info("copied to local snapshot", "bytes", n)
+
+	// Restore snapshot
+	future := &restoreFuture{ID: sink.ID()}
+	future.ShutdownCh = r.shutdownCh
+	future.init()
+	select {
+	case r.fsmMutateCh <- future:
+	case <-r.shutdownCh:
+		future.respond(ErrRaftShutdown)
+		return
+	}
+
+	// Wait for the restore to happen
+	if err := future.Error(); err != nil {
+		r.logger.Error("failed to restore snapshot", "error", err)
+		rpcErr = err
+		return
+	}
+
+	// Update the lastApplied so we don't replay old logs
+	r.setLastApplied(req.LastLogIndex)
+
+	// Update the last stable snapshot info
+	r.setLastSnapshot(req.LastLogIndex, req.LastLogTerm)
+
+	// Restore the peer set
+	r.setLatestConfiguration(reqConfiguration, reqConfigurationIndex)
+	r.setCommittedConfiguration(reqConfiguration, reqConfigurationIndex)
+
+	// Compact logs, continue even if this fails
+	if err := r.compactLogs(req.LastLogIndex); err != nil {
+		r.logger.Error("failed to compact logs", "error", err)
+	}
+
+	r.logger.Info("Installed remote snapshot")
+	resp.Success = true
 	r.setLastContact()
 	return
 }
