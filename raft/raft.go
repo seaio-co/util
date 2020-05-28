@@ -1571,3 +1571,70 @@ func (r *Raft) setLastContact() {
 	r.lastContact = time.Now()
 	r.lastContactLock.Unlock()
 }
+
+type voteResult struct {
+	RequestVoteResponse
+	voterID ServerID
+}
+
+func (r *Raft) electSelf() <-chan *voteResult {
+	// Create a response channel
+	respCh := make(chan *voteResult, len(r.configurations.latest.Servers))
+
+	// Increment the term
+	r.setCurrentTerm(r.getCurrentTerm() + 1)
+
+	// Construct the request
+	lastIdx, lastTerm := r.getLastEntry()
+	req := &RequestVoteRequest{
+		RPCHeader:          r.getRPCHeader(),
+		Term:               r.getCurrentTerm(),
+		Candidate:          r.trans.EncodePeer(r.localID, r.localAddr),
+		LastLogIndex:       lastIdx,
+		LastLogTerm:        lastTerm,
+		LeadershipTransfer: r.candidateFromLeadershipTransfer,
+	}
+
+	// Construct a function to ask for a vote
+	askPeer := func(peer Server) {
+		r.goFunc(func() {
+			defer metrics.MeasureSince([]string{"raft", "candidate", "electSelf"}, time.Now())
+			resp := &voteResult{voterID: peer.ID}
+			err := r.trans.RequestVote(peer.ID, peer.Address, req, &resp.RequestVoteResponse)
+			if err != nil {
+				r.logger.Error("failed to make requestVote RPC",
+					"target", peer,
+					"error", err)
+				resp.Term = req.Term
+				resp.Granted = false
+			}
+			respCh <- resp
+		})
+	}
+
+	// For each peer, request a vote
+	for _, server := range r.configurations.latest.Servers {
+		if server.Suffrage == Voter {
+			if server.ID == r.localID {
+				// Persist a vote for ourselves
+				if err := r.persistVote(req.Term, req.Candidate); err != nil {
+					r.logger.Error("failed to persist vote", "error", err)
+					return nil
+				}
+				// Include our own vote
+				respCh <- &voteResult{
+					RequestVoteResponse: RequestVoteResponse{
+						RPCHeader: r.getRPCHeader(),
+						Term:      req.Term,
+						Granted:   true,
+					},
+					voterID: r.localID,
+				}
+			} else {
+				askPeer(server)
+			}
+		}
+	}
+
+	return respCh
+}
