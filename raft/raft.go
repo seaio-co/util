@@ -1638,3 +1638,13 @@ func (r *Raft) electSelf() <-chan *voteResult {
 
 	return respCh
 }
+
+func (r *Raft) persistVote(term uint64, candidate []byte) error {
+	if err := r.stable.SetUint64(keyLastVoteTerm, term); err != nil {
+		return err
+	}
+	if err := r.stable.Set(keyLastVoteCand, candidate); err != nil {
+		return err
+	}
+	return nil
+}
