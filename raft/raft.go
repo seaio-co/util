@@ -1648,3 +1648,11 @@ func (r *Raft) persistVote(term uint64, candidate []byte) error {
 	}
 	return nil
 }
+
+func (r *Raft) setCurrentTerm(t uint64) {
+	// Persist to disk first
+	if err := r.stable.SetUint64(keyCurrentTerm, t); err != nil {
+		panic(fmt.Errorf("failed to save current term: %v", err))
+	}
+	r.raftState.setCurrentTerm(t)
+}
