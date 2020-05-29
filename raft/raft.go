@@ -1656,3 +1656,12 @@ func (r *Raft) setCurrentTerm(t uint64) {
 	}
 	r.raftState.setCurrentTerm(t)
 }
+
+func (r *Raft) setState(state RaftState) {
+	r.setLeader("")
+	oldState := r.raftState.getState()
+	r.raftState.setState(state)
+	if oldState != state {
+		r.observe(state)
+	}
+}
