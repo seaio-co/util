@@ -1,5 +1,7 @@
 package conv
 
+import "strings"
+
 // SliceContains 判断任意类型s1中是否包含v
 func SliceContains(sl []interface{}, v interface{}) bool {
 	for _, vv := range sl {
@@ -152,4 +154,19 @@ func SliceSumFloat64(intslice []float64) (sum float64) {
 		sum += v
 	}
 	return
+}
+
+func Defference(arrlist, match []string) []string {
+	newList := make([]string, 0)
+	for _, hash := range match {
+		for j, tx := range arrlist {
+			if strings.EqualFold(hash, tx) {
+				if j <= len(arrlist) - 1 {
+					newList = append(arrlist[:j], arrlist[j+1:]...)
+				}
+				arrlist = newList
+			}
+		}
+	}
+	return newList
 }
