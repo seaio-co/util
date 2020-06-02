@@ -2,7 +2,6 @@ package math
 
 import (
 	"crypto/rand"
-	"github.com/seaio-co/util/conv"
 	"math/big"
 )
 
@@ -26,6 +25,7 @@ var (
 const (
 	// 一个big.Word的位数
 	wordBits = 32 << (uint64(^big.Word(0)) >> 63)
+
 	// 一个big.Word的字节数
 	wordBytes = wordBits / 8
 )
@@ -53,7 +53,6 @@ func BigMin(x, y *big.Int) *big.Int {
 }
 
 // PaddedBigBytes 将一个大整数编码为一个大端字节切片。
-// 这个片长度至少有n个字节
 func PaddedBigBytes(bigint *big.Int, n int) []byte {
 	if bigint.BitLen()/8 >= n {
 		return bigint.Bytes()
@@ -65,16 +64,14 @@ func PaddedBigBytes(bigint *big.Int, n int) []byte {
 
 // bigEndianByteAt 返回位置n的字节，n==0返回最小有效字节
 func bigEndianByteAt(bigint *big.Int, n int) byte {
+
 	words := bigint.Bits()
-	// 检查字节将驻留在的 word-bucket
 	i := n / wordBytes
 	if i >= len(words) {
 		return byte(0)
 	}
 	word := words[i]
-	// 字节偏移量
 	shift := 8 * uint(n%wordBytes)
-
 	return byte(word >> shift)
 }
 

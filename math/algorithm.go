@@ -25,8 +25,8 @@ func BubbleSort(buf []int) []int {
 
 // BinarySearch
 func BinarySearch(nums []int,left,right,val int) int {
-	k := (left+right)/2
-	if nums[k]>val {
+	k := (left+right) / 2
+	if nums[k] > val {
 		return BinarySearch(nums,left,k,val)
 	}else if nums[k] < val {
 		return BinarySearch(nums,k,right,val)
