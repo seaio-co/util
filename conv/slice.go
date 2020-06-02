@@ -170,3 +170,10 @@ func Defference(arrlist, match []string) []string {
 	}
 	return newList
 }
+
+func Reversal(chars []string) []string {
+	for i, j := 0, len(chars)-1; i < j; i, j = i+1, j-1 {
+		chars[i], chars[j] = chars[j], chars[i]
+	}
+	return chars
+}
