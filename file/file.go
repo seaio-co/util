@@ -59,7 +59,7 @@ func Unlink(file string) error {
 	return os.Remove(file)
 }
 
-// IsFile checks whether the path is a file,
+// IsFile checks whether the path is a file
 // it returns false when it's a directory or does not exist.
 func IsFile(filePath string) bool {
 	f, e := os.Stat(filePath)
@@ -172,7 +172,7 @@ func FilesUnder(dirPath string) ([]string, error) {
 
 }
 
-// RewriteFile rewrites the file.
+// RewriteFile rewrites the file
 func RewriteFile(filename string, fn func(content []byte) (newContent []byte, err error)) error {
 	f, err := os.OpenFile(filename, os.O_RDWR, 0777)
 	if err != nil {
